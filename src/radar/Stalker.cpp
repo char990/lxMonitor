@@ -14,6 +14,8 @@ using namespace Radar::Stalker;
 
 using namespace Utils;
 
+#define STALKER_TIMEOUT 1000 // 1000ms
+
 /**************************DBG1*************************/
 void DBG1::Init(const uint8_t *dbg1)
 {
@@ -80,48 +82,53 @@ void LOG::ToString(uint8_t *buf)
 }
 
 /**************************VIHICLE*************************/
-void VehicleList::PushDgb1(uint8_t *dbg1)
+void VehicleList::PushDgb1(const uint8_t *dbg1)
 {
     if (*dbg1 == '\0')
     { // no vehicle
-        gettimeofday(&time, nullptr);
-        VehicleFlush(time); // as there is no vhicle, use current time to flush all vehicles in list
-        SaveDBG1(time, dbg1, nullptr);
+        if (hasVehicle)
+        {
+            hasVehicle = false;
+            gettimeofday(&time, nullptr);
+            SaveDBG1(time, dbg1);
+            vlist.clear(); // as there is no vhicle, clear all vehicles in list
+            Print();
+        }
     }
     else
     {
         auto d = std::shared_ptr<DBG1>(new DBG1(dbg1));
         if (d->id != -1)
         {
-            hasVehicle = true;
-            if (d->number == 0 || (time.tv_sec == 0 && time.tv_usec == 0))
-            {
-                // this is a new cycle
-                // refresh time
-                gettimeofday(&time, nullptr);
-                VehicleFlush(time);
-            }
+            // refresh time
+            gettimeofday(&time, nullptr);
+            VehicleFlush(time);
             d->time = time;
-            bool exists = false;
-            for(auto v = vlist.begin(); v!=vlist.end(); v++)
+            hasVehicle = true;
+            // check if it's new vehicle
+            bool vehicle_exists = false;
+            if (vlist.size() > 0)
             {
-                if ((*v)->Id() == d->id)
+                for (auto v = vlist.begin(); v != vlist.end(); v++)
                 {
-                    exists = true;
-                    (*v)->dbg1list.push_back(d);
+                    if ((*v)->Id() == d->id)
+                    { // exists
+                        (*v)->dbg1list.push_back(d);
+                        SaveDBG1(time, dbg1);
+                        vehicle_exists = true;
+                        break;
+                    }
                 }
             }
-            if(exists)
-            {
-                SaveDBG1(time, dbg1, "");
-            }
-            else
-            {// new vehicle
+            if (!vehicle_exists)
+            { // Not exist in list, new vehicle
                 SaveDBG1(time, dbg1, "Photo taken");
-                auto v = std::shared_ptr<Vehicle>(new Vehicle);
-                v->dbg1list.push_back(d);
-                vlist.push_back(v);
+                auto newv = std::shared_ptr<Vehicle>(new Vehicle);
+                newv->dbg1list.push_back(d);
+                vlist.push_back(newv);
                 newVehicle = true;
+                PrintDbg(DBG_PRT, "New Vehicle:ID=%04d", d->id);
+                Print();
             }
         }
         else
@@ -133,19 +140,25 @@ void VehicleList::PushDgb1(uint8_t *dbg1)
 
 void VehicleList::Print()
 {
-
+    printf("vlist(%d):\n", vlist.size());
+    for (auto v = vlist.begin(); v != vlist.end(); v++)
+    {
+        printf("\tID=%04d\n", (*v)->Id());
+    }
 }
 
 void VehicleList::VehicleFlush(struct timeval &lasttime)
 {
     auto v = vlist.begin();
-    while(v!=vlist.end())
+    while (v != vlist.end())
     {
         auto t = (*v)->dbg1list.back()->time;
-        if (lasttime.tv_sec != 0 && Time::TimevalSubtract(&lasttime, &t) > 1000000)
+        if (lasttime.tv_sec != 0 && Time::TimevalSubtract(&lasttime, &t) > STALKER_TIMEOUT * 1000)
         { // vehicle disappeared
-            (*v)->isGone = true;
-            v = vlist.erase(v);
+            auto id = (*v)->dbg1list.back()->id;
+            v = vlist.erase(v); // erase current and iterate next
+            PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
+            Print();
         }
         else
         {
@@ -155,7 +168,7 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
 }
 
 extern const char *metapath;
-int VehicleList::SaveDBG1(struct timeval &time, const uint8_t *dbg1, const char * str)
+int VehicleList::SaveDBG1(struct timeval &time, const uint8_t *dbg1, const char *str)
 {
     char buf[32];
     Time::ParseTimeToLocalStr(&time, buf);
@@ -197,23 +210,24 @@ int VehicleList::SaveDBG1(struct timeval &time, const uint8_t *dbg1, const char 
     }
     if (csvfd > 0)
     {
+        char xbuf[128];
+        int len;
         if (*dbg1 == '\0')
         { // no vehicle
-            if (hasVehicle)
-            {
-                hasVehicle = false;
-                char xbuf[128];
-                int len = snprintf(xbuf, 127, "%s,There is no vehicle", buf);
-                write(csvfd, xbuf, len);
-            }
+            len = snprintf(xbuf, 127, "%s,There is no vehicle\n", buf);
         }
         else
         {
-            hasVehicle = true;
-            char xbuf[128];
-            int len = snprintf(xbuf, 127, "%s,%s%s\n", buf, dbg1, (str!=nullptr) ? str : "");
-            write(csvfd, xbuf, len);
+            if (str != nullptr)
+            {
+                len = snprintf(xbuf, 127, "%s,%s,%s\n", buf, dbg1, str);
+            }
+            else
+            {
+                len = snprintf(xbuf, 127, "%s,%s\n", buf, dbg1);
+            }
         }
+        write(csvfd, xbuf, len);
     }
     return 0;
 }
@@ -224,7 +238,7 @@ StalkerStat::StalkerStat(UciRadar &uciradar)
 {
     oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, this);
     radarStatus = RadarStatus::READY;
-    ssTimeout.Setms(100);
+    ssTimeout.Setms(STALKER_TIMEOUT);
 }
 
 StalkerStat::~StalkerStat()
@@ -246,8 +260,8 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
         }
         else if (c == '\x0D')
         {
-            ssTimeout.Setms(100);
-            if (dbg1len == DBG1_SIZE || dbg1len == 0)
+            ssTimeout.Setms(STALKER_TIMEOUT);
+            if (dbg1len == DBG1_SIZE-1 || dbg1len == 0)
             {
                 dbg1buf[dbg1len] = '\0';
                 vehicleList.PushDgb1(dbg1buf);
@@ -269,4 +283,3 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
     }
     return 0;
 }
-

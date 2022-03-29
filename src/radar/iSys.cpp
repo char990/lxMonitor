@@ -56,10 +56,10 @@ SD3	DA	SA	FC	PDU	FCS	ED
 #define ISYS_MASTER_ADDR 0x01 // master addr
 
 // protocol control chars
-#define ISYS_FRM_CTRL_SD1 0x10
-#define ISYS_FRM_CTRL_SD2 0x68
-#define ISYS_FRM_CTRL_SD3 0xA2
-#define ISYS_FRM_CTRL_ED 0x16
+#define ISYS_FRM_CTRL_SD1 0x10 // without data
+#define ISYS_FRM_CTRL_SD2 0x68 // variable length
+#define ISYS_FRM_CTRL_SD3 0xA2 // fixed length
+#define ISYS_FRM_CTRL_ED 0x16  // end delimiter
 
 // position/offset
 #define ISYS_FRM_SD21 0
@@ -111,8 +111,86 @@ const uint8_t read_target_list_16bit[] = {
 	// 16	Output of sint16_t variable types (16-Bit output)
 };
 
+int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
+{
+	int fc = (packet[0] == ISYS_FRM_CTRL_SD2 /* check SD2 Frame */) ? 6 /* variable length frames */
+																	: 3 /* fixed length frames */;
+	int output_number = packet[fc + 1];
+	int nrOfTargets = packet[fc + 2];
+	/* check for valid amount of targets */
+	if (nrOfTargets == 0xff)
+	{ // 0xff means clipping, A frame with clipping doesn’t have any targets
+		return 0;
+	}
+	else if (nrOfTargets > MAX_TARGETS)
+	{
+		return -1;
+	}
+	if ((nrOfTargets * 7 + fc + 3 + 2) != packetLen) // check len
+	{
+		return -1;
+	}
+	flag = 0;
+	cnt = 0;
+	auto pData = &packet[fc + 3];
+	for (int i = 0; i < nrOfTargets; i++)
+	{
+		auto &v = vehicles[cnt];
+		// Signal
+		v.signal = *pData;
+		pData += 1;
+		// Velocity
+		v.speed = *(int16_t *)pData * 3600 / 100000; // 0.01m/s -> km/h;
+		pData += 2;
+		// Range: 4004 & 6003 => -32.768 … 32.767 [m]; others => -327.68 … 327.67 [m]
+		v.range = *(int16_t *)pData / ((code == 4004 || code == 6003) ? 1000 : 100); // cm/mm => m
+		pData += 2;
+		// angle
+		v.angle = *(int16_t *)pData / 100; // -327.68 … 327.67 [°]
+		pData += 2;
+		if (v.signal >= MIN_SIGNAL && v.speed >= MIN_SPEED && v.range >= MIN_RANGE)
+		{
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
+void TargetList::MakeTargetMsg(uint8_t *buf, int *len)
+{
+	uint8_t *ptr = buf;
+	*ptr++ = ISYS_FRM_CTRL_SD2;
+	int pdulen = 5 + cnt * 7;
+	*ptr++ = pdulen;
+	*ptr++ = pdulen;
+	*ptr++ = ISYS_FRM_CTRL_SD2;
+	*ptr++ = ISYS_MASTER_ADDR;
+	*ptr++ = ISYS_SLAVE_ADDR;
+	*ptr++ = RADAR_CMD_RD_TGT_LIST;
+	*ptr++ = 1; // list number
+	*ptr++ = cnt;
+	for (int i = 0; i < cnt; i++)
+	{
+		auto &v = vehicles[i];
+		*ptr++ = v.signal;
+		ptr = Cnvt::PutU16(v.speed * 100000 / 3600, ptr);
+		ptr = Cnvt::PutU16(v.range * 100, ptr);
+		ptr = Cnvt::PutU16(v.angle * 100, ptr);
+	}
+	// chekcsum
+	ptr = buf + ISYS_FRM_DA;
+	uint8_t c = 0;
+	for (int i = 0; i < pdulen; i++)
+	{
+		c += *ptr++;
+	}
+	*ptr++ = c;
+	*ptr = ISYS_FRM_CTRL_ED;
+	*len = pdulen + 6;
+}
+
 iSys400x::iSys400x(UciRadar &uciradar)
-	: IRadar(uciradar)
+	: IRadar(uciradar), targetlist(uciradar.radarCode)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::READY;
@@ -185,48 +263,6 @@ int iSys400x::ReadPacket()
 	return rl;
 }
 
-int iSys400x::DecodeTargetFrame()
-{
-	int fc = (packet[0] == ISYS_FRM_CTRL_SD2 /* check SD2 Frame */) ? 6 /* variable length frames */
-																	: 3 /* fixed length frames */;
-	int output_number = packet[fc + 1];
-	int nrOfTargets = packet[fc + 2];
-	/* check for valid amount of targets */
-	if (nrOfTargets == 0xff)
-	{ //0xff means clipping, A frame with clipping doesn’t have any targets
-		return 0;
-	}
-	else if (nrOfTargets > MAX_TARGETS)
-	{
-		return -1;
-	}
-	if ((nrOfTargets * 7 + fc + 3) != packetLen) // check len
-	{
-		return -1;
-	}
-	targetlist.flag = 0;
-	targetlist.cnt = nrOfTargets;
-	auto pData = &packet[fc + 3];
-	for (int i = 0; i < nrOfTargets; i++)
-	{
-		auto &v = targetlist.vehicles[i];
-		// Signal
-		v.signal = *pData;
-		pData += 1;
-		// Velocity
-		v.velocity = *(int16_t *)pData * 3600 / 100000; // 0.01m/s -> km/h;
-		pData += 2;
-		// Range
-		v.range = *(int16_t *)pData / ((uciradar.radarCode == 4004 || uciradar.radarCode == 6003) ? 1000 : 100);
-		pData += 2;
-		// 4004 & 6003 => -32.768 … 32.767 [m]; others => -327.68 … 327.67 [m]
-		// angle
-		v.angle = *(int16_t *)pData / 100; // -327.68 … 327.67 [°]
-		pData += 2;
-	}
-	return nrOfTargets;
-}
-
 iSYS_Status iSys400x::ChkRxFrame(uint8_t *rxBuffer, int len)
 {
 	int chk = rxBuffer[ISYS_FRM_LE] + ISYS_FRM_DA;									   // position of FCS : frame checksum
@@ -269,7 +305,7 @@ void iSys400x::CmdReadTargetList()
 	SendSd2(read_target_list_16bit, countof(read_target_list_16bit));
 }
 
-bool iSys400x::TaskRadar_(int *_ptLine)
+bool iSys400x::TaskRadarPoll_(int *_ptLine)
 {
 	PT_BEGIN();
 	while (true)
@@ -289,28 +325,24 @@ bool iSys400x::TaskRadar_(int *_ptLine)
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if (ReadPacket() > 0)
 			{
-				radarStatus = RadarStatus::READY;
-				if (DecodeTargetFrame() > 0)
+				int x = targetlist.DecodeTargetFrame(packet, packetLen);
+				if (x == 0)
 				{
-					int min = 9999;
-					int targeti=-1;
-					for(int i=0;i<targetlist.cnt;i++)
+					radarStatus = RadarStatus::EVENT;
+					minRangeVehicle = nullptr;
+				}
+				else if (x > 0)
+				{
+					minRangeVehicle = &targetlist.vehicles[0];
+					for (int i = 1; i < targetlist.cnt; i++)
 					{
-						auto & v = targetlist.vehicles[i];
-						if(v.signal>50)
+						auto &v = targetlist.vehicles[i];
+						if (v.range < minRangeVehicle->range)
 						{
-							if(v.range>0 && v.range<min)
-							{
-								targeti = i;
-								min = v.range;
-							}
+							minRangeVehicle = &targetlist.vehicles[i];
 						}
 					}
-					if(targeti>=0)
-					{
-						minRangeVehicle = targetlist.vehicles[targeti];
-						radarStatus = RadarStatus::EVENT;
-					}
+					radarStatus = RadarStatus::EVENT;
 				}
 			}
 		} while (radarStatus != RadarStatus::NO_CONNECTION);

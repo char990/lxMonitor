@@ -25,19 +25,36 @@ namespace Radar
             ISYS_CMD_FAILD,
         };
 
-        struct Vehicle
-        {                     // only use 16-bit resolution
-            uint8_t signal;   // db
-            int16_t velocity; // km/h
-            int16_t range;    // m
-            int16_t angle;    // deg
+#define MIN_SIGNAL 50
+#define MIN_SPEED 0
+#define MIN_RANGE 2
+
+        class Vehicle
+        {
+        public:             // only use 16-bit resolution
+            uint8_t signal; // db
+            int16_t speed;  // km/h
+            int16_t range;  // m
+            int16_t angle;  // deg
         };
 
-        struct TargetList
+        class TargetList
         {
+        public:
+            TargetList(int code) : code(code){};
             uint32_t flag{0};
             int cnt{0};
             Vehicle vehicles[MAX_TARGETS];
+
+            /// \brief  decodes target list frame received from iSYS device - Note: only 16-bit.
+            /// \return -1:Error; 0:NO target; 1-MAX:number of target
+            int DecodeTargetFrame(uint8_t *packet, int packetLen);
+
+            /// \brief For unit test
+            void MakeTargetMsg(uint8_t *buf, int *len);
+
+        private:
+            int code;
         };
 
         class iSys400x : public IRadar
@@ -48,16 +65,16 @@ namespace Radar
 
             virtual int RxCallback(uint8_t *buf, int len) override { return 0; }; // No RxCallback for iSYS
 
-            bool TaskRadar() override { return TaskRadar_(&taskRadar_); };
+            bool TaskRadarPoll() override { return TaskRadarPoll_(&taskRadar_); };
 
-            Vehicle &MinRangeVehicle() { return minRangeVehicle; };
+            Vehicle *minRangeVehicle;
 
         protected:
             TargetList targetlist;
 
             BootTimer tmrTaskRadar;
             int taskRadar_;
-            bool TaskRadar_(int *_ptLine);
+            bool TaskRadarPoll_(int *_ptLine);
 
 #define MAX_PACKET_SIZE (9 + MAX_TARGETS * 7 + 1)
             uint8_t packet[MAX_PACKET_SIZE];
@@ -67,16 +84,12 @@ namespace Radar
             void CmdStopAcquisition();
             void CmdReadTargetList();
             bool VerifyCmdAck();
-            /// \brief  decodes target list frame received from iSYS device - Note: only 16-bit.
-            /// \return -1:Error; 0:NO target; 1-MAX:number of target
-            int DecodeTargetFrame();
-            iSYS_Status ChkRxFrame(uint8_t *buf, int len);
+            iSYS_Status ChkRxFrame(uint8_t *packet, int packetLen);
+
             int ReadPacket();
 
             /// \brief return false if radarlost
             bool GetTarget();
-
-            Vehicle minRangeVehicle;
         };
 
     }

@@ -55,22 +55,22 @@ void UciSettings::LoadConfig()
 		{
 			c.distance.at(i) = ibuf[i];
 		}
+		const char * isys = GetStr(uciSec, _iSys);
+		const char * stalker = GetStr(uciSec, _Stalker);
 		// isys
-		SECTION = GetStr(uciSec, _iSys);
-		uciSec = GetSection(SECTION);
-		c.iSys.name = std::string(SECTION);
-		c.iSys.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, true);
-		c.iSys.radarBps = ALLOWEDBPS[GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true)];
+		uciSec = GetSection(isys);
+		c.iSys.name = std::string(isys);
+		c.iSys.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, COMPORT_SIZE);
+		c.iSys.radarBps = GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true);
 		c.iSys.radarId = GetInt(uciSec, _RadarId, 2, 255, true); // 0 & 1 not allowed
 		c.iSys.radarMode = GetInt(uciSec, _RadarMode, INT_MIN, INT_MAX, true);
 		c.iSys.radarCode = GetInt(uciSec, _RadarCode, INT_MIN, INT_MAX, true);
 
 		// stalker
-		SECTION = GetStr(uciSec, _Stalker);
-		uciSec = GetSection(SECTION);
-		c.stalker.name = std::string(SECTION);
-		c.stalker.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, true);
-		c.stalker.radarBps = ALLOWEDBPS[GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true)];
+		uciSec = GetSection(stalker);
+		c.stalker.name = std::string(stalker);
+		c.stalker.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, COMPORT_SIZE);
+		c.stalker.radarBps = GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true);
 		c.stalker.radarId = GetInt(uciSec, _RadarId, 0, 255, true);
 		c.stalker.radarMode = GetInt(uciSec, _RadarMode, INT_MIN, INT_MAX, true);
 		c.stalker.radarCode = GetInt(uciSec, _RadarCode, INT_MIN, INT_MAX, true);

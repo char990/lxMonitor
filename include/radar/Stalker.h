@@ -14,11 +14,11 @@ namespace Radar
 {
     namespace Stalker
     {
-#define DIRX '?' // 'A':away / 'C':close / '?':unknown/both
+#define DIRX 'C' // 'A':away / 'C':close / '?':unknown/both
         class DBG1
         {
         public:
-            DBG1();
+            DBG1(){};
             DBG1(const uint8_t *dbg1) { Init(dbg1); };
             timeval time;
             int number; // if number == 00, it means a new cycle
@@ -61,9 +61,8 @@ namespace Radar
         class Vehicle
         {
         public:
-            int Id() { return dbg1list.size() == 0 ? -1 : dbg1list[0]->id; };
-            std::vector<std::shared_ptr<DBG1>> dbg1list;
-            bool isGone{false};
+            int Id() { return dbg1list.size() == 0 ? -1 : dbg1list.front()->id; };
+            std::list<std::shared_ptr<DBG1>> dbg1list;
         };
 
         class VehicleList
@@ -71,12 +70,12 @@ namespace Radar
         public:
             VehicleList(std::string &name) : name(name){};
             std::list<std::shared_ptr<Vehicle>> vlist;
-            void PushDgb1(uint8_t *dbg1);
+            void PushDgb1(const uint8_t *dbg1);
             bool newVehicle{false};
             bool hasVehicle{false};
 
         private:
-            int SaveDBG1(struct timeval &t, const uint8_t *dbg1, const char *str);
+            int SaveDBG1(struct timeval &t, const uint8_t *dbg1, const char *str=nullptr);
             void VehicleFlush(struct timeval &t);
             struct timeval time
             {
@@ -106,7 +105,7 @@ namespace Radar
                 return radarStatus;
             };
 
-            virtual bool TaskRadar() override { return true; };
+            virtual bool TaskRadarPoll() override { return true; };
 
             bool NewVehicle() { return vehicleList.newVehicle; };
             void NewVehicle(bool v) { vehicleList.newVehicle = v; };

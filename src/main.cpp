@@ -81,7 +81,7 @@ public:
         pPinWdt->Toggle();
         if (ticktock)
         {
-            PrintDbg(DBG_HB, "%c   \x08\x08\x08", s[cnt & 0x03]);
+            PrintDbg(DBG_HB, "%c   \x08\x08\x08", s[++cnt & 0x03]);
             fflush(stdout);
         }
     };

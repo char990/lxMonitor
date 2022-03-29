@@ -22,11 +22,6 @@ private:
     Radar::Stalker::StalkerStat *stalker;
     Camera *camera;
 
-    /*********************TaskMonitor********************/
-    int taskMonitorLine{0};
-    bool TaskMonitor(int *_ptLine);
-    void TaskMonitorReSet() { taskMonitorLine = 0; };
-
     /*********************TaskDistance********************/
     int taskDistanceLine{0};
     bool TaskDistance(int *_ptLine);

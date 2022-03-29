@@ -1,0 +1,36 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/include/**",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot-native/usr/lib/arm-fslc-linux-gnueabi/gcc/arm-fslc-linux-gnueabi/8.3.0/include",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot-native/usr/lib/arm-fslc-linux-gnueabi/gcc/arm-fslc-linux-gnueabi/8.3.0/include-fixed",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include/c++/8.3.0",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include/c++/8.3.0/arm-fslc-linux-gnueabi",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include/c++/8.3.0/backward",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/lib/gcc/arm-fslc-linux-gnueabi/8.3.0/include",
+                "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/**",
+                    "${workspaceFolder}/include/**",
+                    "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include",
+                    "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include/**",
+                    "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include/c++/8.3.0",
+                    "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot/usr/include/c++/8.3.0/**"
+                ]
+            },
+            "defines": [
+                "__ARM_PCS_VFP"
+            ],
+            "compilerPath": "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot-native/usr/bin/arm-fslc-linux-gnueabi/arm-fslc-linux-gnueabi-g++",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "linux-gcc-arm"
+        }
+    ],
+    "version": 4
+}
