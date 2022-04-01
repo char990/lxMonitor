@@ -18,14 +18,19 @@ public:
 
 private:
     int id;
+    UciMonitor &uciMonitor;
     Radar::iSys::iSys400x *isys400x;
     Radar::Stalker::StalkerStat *stalker;
     Camera *camera;
 
-    /*********************TaskDistance********************/
-    int taskDistanceLine{0};
-    bool TaskDistance(int *_ptLine);
-    void TaskDistanceReSet() { taskDistanceLine = 0; };
-    BootTimer tmrDistance;
-
+    /*********************CheckRange********************/
+    bool CheckRange();
+    void TaskRangeReSet()
+    {
+        uciRangeIndex = 0;
+        tmrRange.Setms(60000);
+    };
+    BootTimer tmrRange;
+    int16_t lastRange{-1};
+    int uciRangeIndex{0};
 };

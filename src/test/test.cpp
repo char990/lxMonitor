@@ -1,5 +1,5 @@
 #include <3rdparty/catch2/enable_test.h>
-#ifdef CATCH2TEST
+#if CATCH2TEST != 0
 #define CATCH_CONFIG_MAIN
 #include <time.h>
 #include <string>
@@ -40,37 +40,37 @@ namespace Radar::Stalker
 
         SECTION("legal DBG1")
         {
-            vl.PushDgb1((const uint8_t *)"T00 1027 C  5 C  5 C  5 70    1 ");
+            vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    1 ");
             REQUIRE(vl.vlist.size() == 1);
-            vl.PushDgb1((const uint8_t *)"T01 1999 C  5 C  5 C  5 70   89 ");
+            vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   89 ");
             REQUIRE(vl.vlist.size() == 2);
-            vl.PushDgb1((const uint8_t *)"T02 8888 C  5 C  5 C  5 70    1 ");
+            vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    1 ");
             REQUIRE(vl.vlist.size() == 3);
-            vl.PushDgb1((const uint8_t *)"T00 1027 C  5 C  5 C  5 70    2 ");
+            vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    2 ");
             REQUIRE(vl.vlist.size() == 3);
-            vl.PushDgb1((const uint8_t *)"T01 1999 C  5 C  5 C  5 70   90 ");
+            vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   90 ");
             REQUIRE(vl.vlist.size() == 3);
-            vl.PushDgb1((const uint8_t *)"T02 8888 C  5 C  5 C  5 70    2 ");
+            vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    2 ");
             REQUIRE(vl.vlist.size() == 3);
             printf("No vehicle\n");
-            vl.PushDgb1((const uint8_t *)"\0");
+            vl.PushDgb1("\0");
             REQUIRE(vl.vlist.size() == 0);
-            vl.PushDgb1((const uint8_t *)"T00 1027 C  5 C  5 C  5 70    1 ");
+            vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    1 ");
             REQUIRE(vl.vlist.size() == 1);
-            vl.PushDgb1((const uint8_t *)"T01 1999 C  5 C  5 C  5 70   89 ");
+            vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   89 ");
             REQUIRE(vl.vlist.size() == 2);
-            vl.PushDgb1((const uint8_t *)"T02 8888 C  5 C  5 C  5 70    1 ");
+            vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    1 ");
             REQUIRE(vl.vlist.size() == 3);
-            vl.PushDgb1((const uint8_t *)"T00 1027 C  5 C  5 C  5 70    2 ");
+            vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    2 ");
             REQUIRE(vl.vlist.size() == 3);
-            vl.PushDgb1((const uint8_t *)"T01 1999 C  5 C  5 C  5 70   90 ");
+            vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   90 ");
             REQUIRE(vl.vlist.size() == 3);
-            vl.PushDgb1((const uint8_t *)"T02 8888 C  5 C  5 C  5 70    2 ");
+            vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    2 ");
             REQUIRE(vl.vlist.size() == 3);
             printf("sleep(3)\n");
             sleep(3);
             printf("New vehicle\n");
-            vl.PushDgb1((const uint8_t *)"T00 9027 C  5 C  5 C  5 70    2 ");
+            vl.PushDgb1("T00 9027 C  5 C  5 C  5 70    2 ");
             REQUIRE(vl.vlist.size() == 1);
         }
     }

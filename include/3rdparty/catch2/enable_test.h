@@ -1,1 +1,1 @@
-#define CATCH2TEST
+#define CATCH2TEST 0

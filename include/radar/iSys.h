@@ -7,6 +7,7 @@
 #include <module/SerialPort.h>
 #include <module/IOperator.h>
 #include <module/BootTimer.h>
+#include <fsworker/SaveCSV.h>
 
 namespace Radar
 {
@@ -36,13 +37,15 @@ namespace Radar
             int16_t speed;  // km/h
             int16_t range;  // m
             int16_t angle;  // deg
+            int Print() { return printf("isys400x:%dDB, %dKM/H, %dM, angle=%dDEG\n", signal, speed, range, angle); }
+            int Print(char *buf) { return sprintf(buf, "[S=%d V=%d R=%d A=%d]", signal, speed, range, angle); }
         };
 
         class TargetList
         {
         public:
-            TargetList(int code) : code(code){};
-            uint32_t flag{0};
+            TargetList(std::string &name, int code) : name(name), code(code), csv(name + "Tlist"){};
+            int flag{0}; // return of DecodeTargetFrame
             int cnt{0};
             Vehicle vehicles[MAX_TARGETS];
 
@@ -53,8 +56,18 @@ namespace Radar
             /// \brief For unit test
             void MakeTargetMsg(uint8_t *buf, int *len);
 
+            int SaveTarget(const char *comment);
+
         private:
             int code;
+            bool hasVehicle{false};
+            std::string &name;
+            SaveCSV csv;
+            struct timeval time
+            {
+                0, 0
+            };
+            int PrintList(char *buf);
         };
 
         class iSys400x : public IRadar
@@ -68,6 +81,8 @@ namespace Radar
             bool TaskRadarPoll() override { return TaskRadarPoll_(&taskRadar_); };
 
             Vehicle *minRangeVehicle;
+
+            int SaveTarget(const char *comment) { return targetlist.SaveTarget(comment); };
 
         protected:
             TargetList targetlist;
@@ -86,11 +101,11 @@ namespace Radar
             bool VerifyCmdAck();
             iSYS_Status ChkRxFrame(uint8_t *packet, int packetLen);
 
+            /// \brief Read packet. If there are more than one packet in buf, only keep the last packet
+            /// \return packet length
             int ReadPacket();
 
-            /// \brief return false if radarlost
-            bool GetTarget();
+            void ClearRxBuf() { oprSp->rxRingBuf->Reset(); };
         };
-
     }
 }

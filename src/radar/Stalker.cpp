@@ -1,10 +1,5 @@
 #include <radar/Stalker.h>
 #include <cstdio>
-#include <memory>
-#include <fcntl.h>
-#include <cstdlib>
-#include <unistd.h>
-#include <sys/stat.h>
 
 #include <module/Utils.h>
 #include <module/MyDbg.h>
@@ -17,9 +12,9 @@ using namespace Utils;
 #define STALKER_TIMEOUT 1000 // 1000ms
 
 /**************************DBG1*************************/
-void DBG1::Init(const uint8_t *dbg1)
+void DBG1::Init(const char *dbg1)
 {
-    int s = sscanf((char *)dbg1, "T%d %d %c%d %c%d %c%d %d %d",
+    int s = sscanf(dbg1, "T%d %d %c%d %c%d %c%d %d %d",
                    &number, &id, &lastDir, &lastSp, &pkDir, &pkSp, &avgDir, &avgSp, &strength, &duration);
     if (s != 10 || number > 99 || id > 9999 ||
         (DIRX != '?' && (lastDir != DIRX || pkDir != DIRX || avgDir != DIRX)) ||
@@ -33,23 +28,23 @@ void DBG1::Init(const uint8_t *dbg1)
 
 std::string DBG1::ToString()
 {
-    uint8_t buf[33]; // replace 0x0D with '\0'
+    char buf[33]; // replace 0x0D with '\0'
     buf[0] = 0;
     ToString(buf);
-    return std::string((char *)buf);
+    return std::string(buf);
 }
 
-int DBG1::ToString(const uint8_t *buf)
+int DBG1::ToString(char *buf)
 {
-    return snprintf((char *)buf, 33, "T%02d %4d %c%3d %c%3d %c%3d %2d %4d ",
+    return snprintf(buf, 33, "T%02d %4d %c%3d %c%3d %c%3d %2d %4d ",
                     number, id, lastDir, lastSp, pkDir, pkSp, avgDir, avgSp, strength, duration);
 }
 
 /**************************LOG*************************/
-void LOG::Init(uint8_t *log)
+void LOG::Init(const char *log)
 {
     char c;
-    int s = sscanf((char *)log, "LOG %d %d/%d/%d %d:%d:%d %c%c%c%c L%d P%d A%d %d %d %d",
+    int s = sscanf(log, "LOG %d %d/%d/%d %d:%d:%d %c%c%c%c L%d P%d A%d %d %d %d",
                    &id,
                    &duration, &duration, &duration, &duration, &duration, &duration,
                    &dir, &c, &c, &c, &lastSp, &pkSp, &avgSp, &strength, &classification, &duration);
@@ -65,16 +60,16 @@ void LOG::Init(uint8_t *log)
 
 std::string LOG::ToString()
 {
-    uint8_t buf[60];
+    char buf[60];
     ToString(buf);
-    return std::string((char *)buf);
+    return std::string(buf);
 }
 
-void LOG::ToString(uint8_t *buf)
+void LOG::ToString(char *buf)
 {
     struct tm rtm;
     localtime_r(&time.tv_sec, &rtm);
-    sprintf((char *)buf, "LOG %d %d/%d/%d %d:%d:%d %s L%d P%d A%d %d %d %d",
+    sprintf(buf, "LOG %d %d/%d/%d %d:%d:%d %s L%d P%d A%d %d %d %d",
             id,
             rtm.tm_year + 1900, rtm.tm_mon + 1, rtm.tm_mday, rtm.tm_hour, rtm.tm_min, rtm.tm_sec,
             dir == 'C' ? "CLOS" : "AWAY",
@@ -82,7 +77,7 @@ void LOG::ToString(uint8_t *buf)
 }
 
 /**************************VIHICLE*************************/
-void VehicleList::PushDgb1(const uint8_t *dbg1)
+void VehicleList::PushDgb1(const char *dbg1)
 {
     if (*dbg1 == '\0')
     { // no vehicle
@@ -90,7 +85,7 @@ void VehicleList::PushDgb1(const uint8_t *dbg1)
         {
             hasVehicle = false;
             gettimeofday(&time, nullptr);
-            SaveDBG1(time, dbg1);
+            SaveDBG1(dbg1);
             vlist.clear(); // as there is no vhicle, clear all vehicles in list
             Print();
         }
@@ -114,7 +109,7 @@ void VehicleList::PushDgb1(const uint8_t *dbg1)
                     if ((*v)->Id() == d->id)
                     { // exists
                         (*v)->dbg1list.push_back(d);
-                        SaveDBG1(time, dbg1);
+                        SaveDBG1(dbg1);
                         vehicle_exists = true;
                         break;
                     }
@@ -122,7 +117,7 @@ void VehicleList::PushDgb1(const uint8_t *dbg1)
             }
             if (!vehicle_exists)
             { // Not exist in list, new vehicle
-                SaveDBG1(time, dbg1, "Photo taken");
+                SaveDBG1(dbg1, PHOTO_TAKEN);
                 auto newv = std::shared_ptr<Vehicle>(new Vehicle);
                 newv->dbg1list.push_back(d);
                 vlist.push_back(newv);
@@ -133,7 +128,7 @@ void VehicleList::PushDgb1(const uint8_t *dbg1)
         }
         else
         {
-            SaveDBG1(time, dbg1, "Invalid DBG1");
+            SaveDBG1(dbg1, "Invalid DBG1");
         }
     }
 }
@@ -167,67 +162,15 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
     }
 }
 
-extern const char *metapath;
-int VehicleList::SaveDBG1(struct timeval &time, const uint8_t *dbg1, const char *str)
+int VehicleList::SaveDBG1(const char *dbg1, const char *comment)
 {
-    char buf[32];
-    Time::ParseTimeToLocalStr(&time, buf);
-    if (memcmp(lastdate, buf, 10) != 0)
-    {
-        if (csvfd > 0)
-        {
-            close(csvfd);
-        }
-        memcpy(lastdate, buf, 10);
-        lastdate[10] = '\0';
-        char date[9];
-        date[0] = lastdate[6]; // year
-        date[1] = lastdate[7];
-        date[2] = lastdate[8];
-        date[3] = lastdate[9];
-        date[4] = lastdate[3]; // month
-        date[5] = lastdate[4];
-        date[6] = lastdate[0]; // date
-        date[7] = lastdate[1];
-        date[8] = 0;
-        char csv[256];
-        sprintf(csv, "mkdir -p %s/%s", metapath, date);
-        csvfd = system(csv);
-        if (csvfd != 0)
-        {
-            PrintDbg(DBG_LOG, "Can NOT mkdir '%s/%s'", metapath, date);
-            csvfd = -1;
-        }
-        else
-        {
-            sprintf(csv, "%s/%s/%sDBG1.csv", metapath, date, name.c_str());
-            csvfd = open(csv, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
-            if (csvfd < 0)
-            {
-                PrintDbg(DBG_LOG, "Can NOT open '%s'", csv);
-            }
-        }
+    if (*dbg1 == '\0')
+    { // no vehicle
+        csv.SaveRadarMeta(time, "There is no vehicle\n", nullptr);
     }
-    if (csvfd > 0)
+    else
     {
-        char xbuf[128];
-        int len;
-        if (*dbg1 == '\0')
-        { // no vehicle
-            len = snprintf(xbuf, 127, "%s,There is no vehicle\n", buf);
-        }
-        else
-        {
-            if (str != nullptr)
-            {
-                len = snprintf(xbuf, 127, "%s,%s,%s\n", buf, dbg1, str);
-            }
-            else
-            {
-                len = snprintf(xbuf, 127, "%s,%s\n", buf, dbg1);
-            }
-        }
-        write(csvfd, xbuf, len);
+        csv.SaveRadarMeta(time, dbg1, comment);
     }
     return 0;
 }
@@ -238,7 +181,7 @@ StalkerStat::StalkerStat(UciRadar &uciradar)
 {
     oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, this);
     radarStatus = RadarStatus::READY;
-    ssTimeout.Setms(STALKER_TIMEOUT);
+    ReloadTmrssTimeout();
 }
 
 StalkerStat::~StalkerStat()
@@ -260,11 +203,11 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
         }
         else if (c == '\x0D')
         {
-            ssTimeout.Setms(STALKER_TIMEOUT);
-            if (dbg1len == DBG1_SIZE-1 || dbg1len == 0)
+            ReloadTmrssTimeout();
+            if (dbg1len == DBG1_SIZE - 1 || dbg1len == 0)
             {
                 dbg1buf[dbg1len] = '\0';
-                vehicleList.PushDgb1(dbg1buf);
+                vehicleList.PushDgb1((const char *)dbg1buf);
                 radarStatus = RadarStatus::EVENT;
             }
             dbg1len = 0;

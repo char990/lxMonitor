@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include <Consts.h>
+
 #include <module/Epoll.h>
 #include <module/SerialPort.h>
 #include <module/TimerEvent.h>
@@ -20,15 +22,13 @@
 #include <module/DebugConsole.h>
 
 #include <radar/Monitor.h>
+#include <fsworker/SpaceGC.h>
 
 #include <websocket/WsServer.h>
 
 #include <3rdparty/catch2/enable_test.h>
 
-const char *FirmwareVer = "0100";
-const char *CONFIG_PATH = "config";
-const char *metapath = "/mnt/mmcblk0p1";
-char *mainpath;
+const char *mainpath;
 
 using namespace std;
 
@@ -134,7 +134,7 @@ void GpioInit()
     pPinMosfet2 = new GpioOut(PIN_MOSFET2_CTRL, 0); // mosfet off
 }
 
-#ifdef CATCH2TEST
+#if CATCH2TEST != 0
 int test_mask_main(int argc, char *argv[])
 #else
 int main(int argc, char *argv[])
@@ -153,16 +153,20 @@ int main(int argc, char *argv[])
     // --------------------------------------------------
     try
     {
-        DbHelper::Instance().Init(CONFIG_PATH);
         PrintVersion(true);
+        DbHelper::Instance().Init(CONFIG_PATH);
+        
         GpioInit();
         Epoll::Instance().Init(32);
         auto tmrEvt10ms = new TimerEvent{10, "[tmrEvt10ms]"};
         auto tmrEvt100ms = new TimerEvent{100, "[tmrEvt100ms]"};
         auto tmrEvt1Sec = new TimerEvent{1000, "[tmrEvt1Sec]"};
-        auto pTickTock = new TickTock{};
-        tmrEvt1Sec->Add(pTickTock);
+        
+        tmrEvt1Sec->Add(new TickTock());
+        tmrEvt1Sec->Add(new SpaceGC());
+        
         auto console = new DebugConsole();
+        
 
         // monitor
         auto monitor1 = new Monitor(1);

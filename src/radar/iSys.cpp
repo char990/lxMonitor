@@ -113,6 +113,8 @@ const uint8_t read_target_list_16bit[] = {
 
 int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 {
+	cnt = 0;
+	gettimeofday(&time, nullptr);
 	int fc = (packet[0] == ISYS_FRM_CTRL_SD2 /* check SD2 Frame */) ? 6 /* variable length frames */
 																	: 3 /* fixed length frames */;
 	int output_number = packet[fc + 1];
@@ -120,7 +122,7 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 	/* check for valid amount of targets */
 	if (nrOfTargets == 0xff)
 	{ // 0xff means clipping, A frame with clipping doesn’t have any targets
-		return 0;
+		return 0xFF;
 	}
 	else if (nrOfTargets > MAX_TARGETS)
 	{
@@ -130,8 +132,6 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 	{
 		return -1;
 	}
-	flag = 0;
-	cnt = 0;
 	auto pData = &packet[fc + 3];
 	for (int i = 0; i < nrOfTargets; i++)
 	{
@@ -189,8 +189,48 @@ void TargetList::MakeTargetMsg(uint8_t *buf, int *len)
 	*len = pdulen + 6;
 }
 
+int TargetList::SaveTarget(const char *comment)
+{
+	if (cnt == 0)
+	{ // no vehicle
+		switch (flag)
+		{
+		case -1:
+			csv.SaveRadarMeta(time, "Invalid taget list", nullptr);
+			break;
+		case 0:
+			if (hasVehicle)
+			{
+				hasVehicle = false;
+				csv.SaveRadarMeta(time, "There is no vehicle", nullptr);
+			}
+			break;
+		case 0xFF:
+			csv.SaveRadarMeta(time, "Clipping", nullptr);
+			break;
+		}
+	}
+	else
+	{
+		char xbuf[1024];
+		PrintList(xbuf);
+		csv.SaveRadarMeta(time, xbuf, comment);
+	}
+	return 0;
+}
+
+int TargetList::PrintList(char *buf)
+{
+	int len = sprintf(buf, "%d:", cnt);
+	for (int i = 0; i < cnt; i++)
+	{
+		len += vehicles[i].Print(buf + len);
+	}
+	return len;
+}
+
 iSys400x::iSys400x(UciRadar &uciradar)
-	: IRadar(uciradar), targetlist(uciradar.radarCode)
+	: IRadar(uciradar), targetlist(uciradar.name, uciradar.radarCode)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::READY;
@@ -231,8 +271,8 @@ bool iSys400x::VerifyCmdAck()
 
 int iSys400x::ReadPacket()
 {
+	packetLen = 0;
 	int len = oprSp->rxRingBuf->Cnt();
-	int rl = 0;
 	if (len > 0)
 	{
 		auto buf = new uint8_t[len];
@@ -240,27 +280,24 @@ int iSys400x::ReadPacket()
 		int indexSD2 = -1;
 		for (int i = 0; i < len; i++)
 		{
-			if (buf[i] == ISYS_FRM_CTRL_SD2 && indexSD2 == -1)
+			if (buf[i] == ISYS_FRM_CTRL_SD2)
 			{
 				indexSD2 = i;
 			}
 			else if (buf[i] == ISYS_FRM_CTRL_ED && indexSD2 >= 0)
 			{
-				rl = i - indexSD2 + 1;
+				int rl = i - indexSD2 + 1;
 				if (rl <= MAX_PACKET_SIZE && ChkRxFrame(buf + indexSD2, rl) == iSYS_Status::ISYS_RX_SUCCESS)
 				{
 					memcpy(packet, buf + indexSD2, rl);
 					packetLen = rl;
 				}
-				else
-				{
-					rl = 0;
-				}
+				indexSD2 = -1;
 			}
 		}
 		delete[] buf;
 	}
-	return rl;
+	return packetLen;
 }
 
 iSYS_Status iSys400x::ChkRxFrame(uint8_t *rxBuffer, int len)
@@ -280,14 +317,7 @@ iSYS_Status iSys400x::ChkRxFrame(uint8_t *rxBuffer, int len)
 	{
 		c += rxBuffer[i];
 	}
-	if (c == rxBuffer[chk])
-	{
-		return iSYS_Status::ISYS_RX_SUCCESS;
-	}
-	else
-	{
-		return iSYS_Status::ISYS_RX_SUM_ERROR;
-	}
+	return c == rxBuffer[chk] ? iSYS_Status::ISYS_RX_SUCCESS : iSYS_Status::ISYS_RX_SUM_ERROR;
 }
 
 void iSys400x::CmdStartAcquisition()
@@ -312,21 +342,24 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	{
 		do
 		{
-			VerifyCmdAck();
+			ClearRxBuf();
 			CmdStartAcquisition();
 			tmrTaskRadar.Setms(500);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 		} while (!VerifyCmdAck());
 		do
 		{
-			VerifyCmdAck();
+			ClearRxBuf();
 			CmdReadTargetList();
 			tmrTaskRadar.Setms(100);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+
 			if (ReadPacket() > 0)
 			{
+				ReloadTmrssTimeout();
 				int x = targetlist.DecodeTargetFrame(packet, packetLen);
-				if (x == 0)
+				targetlist.flag = x;
+				if (x == 0 || x == 0xFF)
 				{
 					radarStatus = RadarStatus::EVENT;
 					minRangeVehicle = nullptr;
@@ -345,7 +378,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 					radarStatus = RadarStatus::EVENT;
 				}
 			}
-		} while (radarStatus != RadarStatus::NO_CONNECTION);
+		} while (GetStatus() != RadarStatus::NO_CONNECTION);
 	};
 	PT_END();
 }

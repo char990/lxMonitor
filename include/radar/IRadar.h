@@ -1,6 +1,8 @@
 #pragma once
 
 #include <module/OprSp.h>
+#include <module/MyDbg.h>
+#include <module/BootTimer.h>
 #include <uci/UciSettings.h>
 
 namespace Radar
@@ -20,7 +22,32 @@ namespace Radar
     public:
         IRadar(UciRadar &uciradar) : uciradar(uciradar){};
         virtual int RxCallback(uint8_t *buf, int len) = 0;
-        virtual RadarStatus GetStatus() { return radarStatus; };
+        virtual RadarStatus GetStatus()
+        {
+            if (ssTimeout.IsExpired())
+            {
+                radarStatus = RadarStatus::NO_CONNECTION;
+            }
+            if (radarStatus == RadarStatus::NO_CONNECTION)
+            {
+                // NO_CONNECTION
+                if (IsConnected())
+                {
+                    Connected(false);
+                    PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
+                }
+            }
+            else if (radarStatus == RadarStatus::EVENT)
+            {
+                if (!IsConnected())
+                {
+                    Connected(true);
+                    PrintDbg(DBG_LOG, "%s connected", uciradar.name.c_str());
+                }
+            }
+            return radarStatus;
+        };
+
         virtual void SetStatus(RadarStatus s) { radarStatus = s; };
         virtual bool TaskRadarPoll() = 0;
         UciRadar &uciradar;
@@ -35,5 +62,7 @@ namespace Radar
 
         OprSp *oprSp{nullptr};
         RadarStatus radarStatus{RadarStatus::POWER_UP};
+        BootTimer ssTimeout;
+        void ReloadTmrssTimeout() { ssTimeout.Setms(3000); };
     };
 }
