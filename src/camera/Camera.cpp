@@ -4,11 +4,18 @@
 Camera::Camera(int id)
     : id(id)
 {
-    trigger = pOutput[id - 1];
+    takephoto = pOutput[id - 1];
+    alarm = pInput[id - 1];
 }
 
 Camera::~Camera()
 {
+}
+
+void Camera::PeriodicRun()
+{
+    alarm->PeriodicRun();
+    TaskTakePhoto(&taskTakePhotoLine);
 }
 
 bool Camera::TaskTakePhoto(int *_ptLine)
@@ -18,10 +25,10 @@ bool Camera::TaskTakePhoto(int *_ptLine)
     {
         PT_WAIT_UNTIL(toTakePhoto == true);
         toTakePhoto = false;
-        trigger->SetPinHigh();
+        takephoto->SetPinHigh();
         tmrTakePhoto.Setms(500);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
-        trigger->SetPinLow();
+        takephoto->SetPinLow();
         tmrTakePhoto.Setms(500);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
     };

@@ -11,13 +11,17 @@ class SpaceGC : public IPeriodicRun
 public:
     SpaceGC()
     {
-        ts = time(nullptr);
         CollectGarbage();
     };
     virtual void PeriodicRun() override;
 
 private:
-    time_t ts;
+    time_t ts{0};
     struct statvfs fiData;
+
+    int StatVfs();
+
     void CollectGarbage();
+
+    int PrintStatVfs(char *buf);
 };

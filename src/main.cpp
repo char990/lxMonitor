@@ -26,7 +26,7 @@
 
 #include <websocket/WsServer.h>
 
-#include <3rdparty/catch2/enable_test.h>
+
 
 const char *mainpath;
 
@@ -132,14 +132,24 @@ void GpioInit()
     pPinRelay = new GpioOut(PIN_RELAY_CTRL, 0);     // relay off
     pPinMosfet1 = new GpioOut(PIN_MOSFET1_CTRL, 0); // mosfet off
     pPinMosfet2 = new GpioOut(PIN_MOSFET2_CTRL, 0); // mosfet off
+
+    pPinIn1 = new GpioIn(5, 5, PIN_IN1);    // read in tmrEvt10ms
+    pPinIn2 = new GpioIn(5, 5, PIN_IN2);    // read in tmrEvt10ms
+    pPinIn3 = new GpioIn(5, 5, PIN_IN3);    // read in tmrEvt10ms
 }
 
-#if CATCH2TEST != 0
-int test_mask_main(int argc, char *argv[])
-#else
-int main(int argc, char *argv[])
-#endif
+#include <3rdparty/catch2/EnableTest.h>
+#if _ENABLE_TEST_ == 1
+#define CATCH_CONFIG_MAIN
+#include <3rdparty/catch2/catch.hpp>
+TEST_CASE("main init", "[main init]")
 {
+    mainpath = get_current_dir_name();
+}
+int test_mask_main(int argc, char *argv[]){
+#else
+int main(int argc, char *argv[]){
+#endif
     // setenv("MALLOC_TRACE","./test.log",1);
     // mtrace();
     mainpath = get_current_dir_name();

@@ -191,6 +191,11 @@ namespace Utils
 
         /// \brief  Swap byte of uint16_t
         static uint16_t SwapU16(uint16_t v);
+
+        /// \brief  Get int16_t from uint8_t array, [0]=high byte,[1]=low byte
+        static int16_t GetS16hl(uint8_t *p);
+        /// \brief  Get int16_t from uint8_t array, [0]=low byte,[1]=high byte
+        static int16_t GetS16lh(uint8_t *p);
     };
 
     class Crc
@@ -200,7 +205,7 @@ namespace Utils
 // If combines the data packet with the crc to be a new data packet,
 // the crc of the new data packet will be 0
 
-//CRC8-CCITT - x^8+x^2+x+1
+// CRC8-CCITT - x^8+x^2+x+1
 /*
         This CRC can be specified as:
         Width  : 8
@@ -220,7 +225,7 @@ namespace Utils
         static uint16_t Crc16(const uint16_t *table, uint8_t *buf, int len,
                               uint16_t init, bool refIn, bool refOut, uint16_t xorOut);
 
-        //CRC16-CCITT polynomial X^16 + X^12 + X^5 + X^0 0x11021
+        // CRC16-CCITT polynomial X^16 + X^12 + X^5 + X^0 0x11021
         /*
         This CRC can be specified as:
         Width  : 16
@@ -233,7 +238,7 @@ namespace Utils
         static const uint16_t crc16_1021[256];
         static uint16_t Crc16_1021(uint8_t *buf, int len, uint16_t precrc = PRE_CRC16);
 
-        //CRC16-IBM polynomial X^15 + X^2 + X^0 0x8005
+        // CRC16-IBM polynomial X^15 + X^2 + X^0 0x8005
         /* !!! Not test
         This CRC can be specified as:
         Width  : 16
@@ -292,7 +297,7 @@ namespace Utils
         static bool DirExists(const char *path);
 
         // run shell command
-        static int Shell(const char * fmt, ...);
+        static int Shell(const char *fmt, ...);
     };
 
     class Time
@@ -308,15 +313,15 @@ namespace Utils
 
         /// \brief      get localtime to stm
         /// \return     time_t
-        static time_t GetLocalTime(struct tm & stm);
+        static time_t GetLocalTime(struct tm &stm);
 
         /// \brief      set system time from localtime-stm
         /// \return     time_t of stm, -1:failed
-        static time_t SetLocalTime(struct tm & stm);
+        static time_t SetLocalTime(struct tm &stm);
 
         /// \brief      check if a broken time is valid
         ///             from 1/1/2001 0:00:00
-        static bool IsTmValid(struct tm & stm);
+        static bool IsTmValid(struct tm &stm);
 
         /// \brief      sleep ms
         static int SleepMs(long msec);
@@ -372,8 +377,8 @@ namespace Utils
         bool GetBit(int bitOffset);
         int GetMaxBit();
         std::string ToString();
-        void Clone(Bits & v);
-        std::vector<uint8_t> & Data() { return data; };
+        void Clone(Bits &v);
+        std::vector<uint8_t> &Data() { return data; };
 
     private:
         int size{0};
@@ -405,7 +410,15 @@ namespace Utils
     template <typename T, std::size_t N>
     constexpr std::size_t countof(T const (&)[N]) noexcept
     {
-    return N;
+        return N;
     }
+
+    /// \brief  More String Functions
+    class StrFn
+    {
+    public:
+        static std::vector<std::string> Split(const std::string& i_str, const std::string& i_delim);
+        static int vsPrint(std::vector<std::string> *vs);
+    };
     
 } // namespace Utils

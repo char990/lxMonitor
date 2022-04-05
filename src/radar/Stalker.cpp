@@ -226,3 +226,80 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
     }
     return 0;
 }
+
+#if 0
+#include <3rdparty/catch2/EnableTest.h>
+#if _ENABLE_TEST_ == 1
+#include <time.h>
+#include <string>
+#include <unistd.h>
+#include <3rdparty/catch2/catch.hpp>
+
+TEST_CASE("Class DBG1", "[DBG1]")
+{
+    DBG1 dbg1;
+
+    SECTION("legal DBG1")
+    {
+        dbg1.Init("T00 1027 C  5 C  5 C  5 70    1 ");
+        REQUIRE(dbg1.id == 1027);
+        dbg1.Init("T01 1999 C  5 C  5 C  5 70   89 ");
+        REQUIRE(dbg1.id == 1999);
+        dbg1.Init("T02 8888 C  5 C  5 C  5 70    1 ");
+        REQUIRE(dbg1.id == 8888);
+    }
+    SECTION("illegal DBG1")
+    {
+        dbg1.Init("T00 1027 A  5 C  5 C  5 70    1 ");
+        REQUIRE(dbg1.id == -1);
+        dbg1.Init("T00 61027 C  5 C  5 C  5 70    1 ");
+        REQUIRE(dbg1.id == -1);
+        dbg1.Init("T00 1027 A  5 C  5 C  5 70 10001 ");
+        REQUIRE(dbg1.id == -1);
+    }
+}
+
+TEST_CASE("Class VehicleList", "[VehicleList]")
+{
+    auto name = std::string("TESTSTALKER1");
+    VehicleList vl(name);
+
+    SECTION("legal DBG1")
+    {
+        vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    1 ");
+        REQUIRE(vl.vlist.size() == 1);
+        vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   89 ");
+        REQUIRE(vl.vlist.size() == 2);
+        vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    1 ");
+        REQUIRE(vl.vlist.size() == 3);
+        vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    2 ");
+        REQUIRE(vl.vlist.size() == 3);
+        vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   90 ");
+        REQUIRE(vl.vlist.size() == 3);
+        vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    2 ");
+        REQUIRE(vl.vlist.size() == 3);
+        printf("No vehicle\n");
+        vl.PushDgb1("\0");
+        REQUIRE(vl.vlist.size() == 0);
+        vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    1 ");
+        REQUIRE(vl.vlist.size() == 1);
+        vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   89 ");
+        REQUIRE(vl.vlist.size() == 2);
+        vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    1 ");
+        REQUIRE(vl.vlist.size() == 3);
+        vl.PushDgb1("T00 1027 C  5 C  5 C  5 70    2 ");
+        REQUIRE(vl.vlist.size() == 3);
+        vl.PushDgb1("T01 1999 C  5 C  5 C  5 70   90 ");
+        REQUIRE(vl.vlist.size() == 3);
+        vl.PushDgb1("T02 8888 C  5 C  5 C  5 70    2 ");
+        REQUIRE(vl.vlist.size() == 3);
+        printf("sleep(3)\n");
+        sleep(3);
+        printf("New vehicle\n");
+        vl.PushDgb1("T00 9027 C  5 C  5 C  5 70    2 ");
+        REQUIRE(vl.vlist.size() == 1);
+    }
+}
+
+#endif
+#endif

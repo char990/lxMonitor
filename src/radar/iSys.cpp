@@ -140,14 +140,14 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 		v.signal = *pData;
 		pData += 1;
 		// Velocity
-		v.speed = *(int16_t *)pData * 3600 / 100000; // 0.01m/s -> km/h;
-		pData += 2;
+		v.speed = Cnvt::GetS16hl(pData) * 3600 / 100000; // 0.01m/s -> km/h;
+		pData+=2;
 		// Range: 4004 & 6003 => -32.768 … 32.767 [m]; others => -327.68 … 327.67 [m]
-		v.range = *(int16_t *)pData / ((code == 4004 || code == 6003) ? 1000 : 100); // cm/mm => m
-		pData += 2;
+		v.range = Cnvt::GetS16hl(pData) / ((code == 4004 || code == 6003) ? 1000 : 100); // cm/mm => m
+		pData+=2;
 		// angle
-		v.angle = *(int16_t *)pData / 100; // -327.68 … 327.67 [°]
-		pData += 2;
+		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
+		pData+=2;
 		if (v.signal >= MIN_SIGNAL && v.speed >= MIN_SPEED && v.range >= MIN_RANGE)
 		{
 			cnt++;
@@ -213,13 +213,13 @@ int TargetList::SaveTarget(const char *comment)
 	else
 	{
 		char xbuf[1024];
-		PrintList(xbuf);
+		Print(xbuf);
 		csv.SaveRadarMeta(time, xbuf, comment);
 	}
 	return 0;
 }
 
-int TargetList::PrintList(char *buf)
+int TargetList::Print(char *buf)
 {
 	int len = sprintf(buf, "%d:", cnt);
 	for (int i = 0; i < cnt; i++)
@@ -227,6 +227,13 @@ int TargetList::PrintList(char *buf)
 		len += vehicles[i].Print(buf + len);
 	}
 	return len;
+}
+
+int TargetList::Print()
+{
+	char buf[1024];
+	Print(buf);
+	return printf("%s\n", buf);
 }
 
 iSys400x::iSys400x(UciRadar &uciradar)
@@ -382,3 +389,55 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	};
 	PT_END();
 }
+
+#if 0
+#include <3rdparty/catch2/EnableTest.h>
+#if _ENABLE_TEST_ == 1
+#include <time.h>
+#include <string>
+#include <unistd.h>
+#include <3rdparty/catch2/catch.hpp>
+
+    TEST_CASE("Class iSys400x", "[iSys400x]")
+    {
+        uint8_t packet[MAX_PACKET_SIZE];
+        int packetLen;
+        std::string name = std::string("iSys400x");
+
+        TargetList list1{name, 4002};
+        list1.cnt = 1;
+        list1.vehicles[0] = {60, 80, 150, 12};
+
+        TargetList list2{name, 4002};
+        list2.cnt = 2;
+        list2.vehicles[0] = {60, 80, 140, 12};
+        list2.vehicles[1] = {61, 70, 150, 12};
+
+        TargetList list3{name, 4002};
+        list3.cnt = 3;
+        list3.vehicles[0] = {60, 80, 130, 12};
+        list3.vehicles[1] = {61, 70, 140, 12};
+        list3.vehicles[2] = {62, 60, 150, 12};
+
+        TargetList target{name, 4002};
+
+        SECTION("DecodeTargetFrame")
+        {
+            int x;
+            list1.MakeTargetMsg(packet, &packetLen);
+            x = target.DecodeTargetFrame(packet, packetLen);
+			target.Print();
+            REQUIRE(x == 1);
+            list2.MakeTargetMsg(packet, &packetLen);
+            x = target.DecodeTargetFrame(packet, packetLen);
+			target.Print();
+            REQUIRE(x == 2);
+            list3.MakeTargetMsg(packet, &packetLen);
+            x = target.DecodeTargetFrame(packet, packetLen);
+			target.Print();
+            REQUIRE(x == 3);
+        }
+    }
+
+#endif
+#endif

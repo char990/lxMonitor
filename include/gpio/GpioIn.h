@@ -20,3 +20,7 @@ private:
     unsigned int pin;
 };
 
+extern GpioIn *pPinIn1;
+extern GpioIn *pPinIn2;
+extern GpioIn *pPinIn3;
+extern GpioIn * pInput[3];

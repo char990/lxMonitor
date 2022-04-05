@@ -56,7 +56,7 @@ void Monitor::PeriodicRun()
         }
     }
     // ----------------- camera -----------------
-    camera->TaskTakePhoto();
+    camera->PeriodicRun();
 }
 
 bool Monitor::CheckRange()
@@ -66,7 +66,7 @@ bool Monitor::CheckRange()
     {
         return false;
     }
-    if (tmrRange.IsExpired() || v->range > (lastRange + 3))
+    if (tmrRange.IsExpired() || (v->range > (lastRange + 3) && v->range <50))
     {
         TaskRangeReSet();
     }
@@ -75,12 +75,13 @@ bool Monitor::CheckRange()
     {
         return false;
     }
+    // should take a photo
     do
     {
         if ( ++ uciRangeIndex >= uciMonitor.distance.size())
         { // last
             TaskRangeReSet();
-            return true;
+            break;
         }
     }while(lastRange < uciMonitor.distance[uciRangeIndex]);
     return true;

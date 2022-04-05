@@ -5,8 +5,8 @@ LDFLAGS  := -luci
 #CXX      := -c++
 #CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -std=c++11
 BUILDTIME := $(shell date +"%b %d %Y %T %Z")
-CFLAGS 	 := -std=gnu11 -D '__BUILDTIME__="$(BUILDTIME)"'
-CXXFLAGS := -std=c++11 -D '__BUILDTIME__="$(BUILDTIME)"'
+CFLAGS 	 := -std=gnu11 -D '__BUILDTIME__="$(BUILDTIME)"' -Wno-psabi
+CXXFLAGS := -std=c++11 -D '__BUILDTIME__="$(BUILDTIME)"' -Wno-psabi
 BUILD    := ./build
 OBJ_DIR  := $(BUILD)/objects
 APP_DIR  := $(BUILD)/apps

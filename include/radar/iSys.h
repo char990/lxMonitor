@@ -58,6 +58,9 @@ namespace Radar
 
             int SaveTarget(const char *comment);
 
+            int Print(char *buf);
+            int Print();
+
         private:
             int code;
             bool hasVehicle{false};
@@ -67,7 +70,6 @@ namespace Radar
             {
                 0, 0
             };
-            int PrintList(char *buf);
         };
 
         class iSys400x : public IRadar

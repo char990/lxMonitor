@@ -249,9 +249,30 @@ void Cnvt::split(const string &s, vector<string> &tokens, const string &delimite
     }
 }
 
+union si16_
+{
+	uint8_t u8a[2];
+	int16_t i16;
+};
 uint16_t Cnvt::SwapU16(uint16_t v)
 {
     return ((v & 0xFF) * 0x100 + v / 0x100);
+}
+
+int16_t Cnvt::GetS16hl(uint8_t *p)
+{
+    si16_ s;
+    s.u8a[1] = p[0];
+    s.u8a[0] = p[1];
+    return s.i16;
+}
+
+int16_t Cnvt::GetS16lh(uint8_t *p)
+{
+    si16_ s;
+    s.u8a[0] = p[0];
+    s.u8a[1] = p[1];
+    return s.i16;
 }
 
 const uint8_t Crc::crc8_table[256] =
@@ -851,3 +872,294 @@ void Bits::Clone(Bits &v)
     size = v.Size();
     data = v.Data();
 }
+
+vector<string> StrFn::Split(const string &i_str, const string &i_delim)
+{
+    vector<string> result;
+
+    size_t found = i_str.find(i_delim);
+    size_t startIndex = 0;
+
+    while (found != string::npos)
+    {
+        result.push_back(string(i_str.begin() + startIndex, i_str.begin() + found));
+        startIndex = found + i_delim.size();
+        found = i_str.find(i_delim, startIndex);
+    }
+    if (startIndex != i_str.size())
+        result.push_back(string(i_str.begin() + startIndex, i_str.end()));
+    return result;
+}
+
+int StrFn::vsPrint(vector<string> *vs)
+{
+    int len = 0;
+    if (vs == nullptr)
+    {
+        len = printf("\tvs is nil\n");
+    }
+    else if (vs->size() == 0)
+    {
+        len = printf("\tvs.size() is 0\n");
+    }
+    else
+    {
+        for (auto &s : *vs)
+        {
+            len += printf("\t%s\n", s.c_str());
+        }
+    }
+    return len;
+}
+
+#if 0
+#define CATCH_CONFIG_MAIN
+#include <3rdparty/catch2/catch.hpp>
+
+#define TEST_BITS
+
+#ifdef TEST_BITS
+    TEST_CASE("Class Utils::Bits", "[Bits]")
+    {
+        Bits b1(256);
+
+        SECTION("256 bits empty")
+        {
+            REQUIRE(b1.Size() == 256);
+            for (int i = 0; i < 256; i++)
+            {
+                REQUIRE(b1.GetBit(i) == false);
+            }
+            REQUIRE(b1.GetMaxBit() == -1);
+        }
+
+        SECTION("SetBit:0")
+        {
+            b1.SetBit(0);
+            REQUIRE(b1.GetMaxBit() == 0);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 0:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("SetBit:0,7")
+        {
+            b1.SetBit(0);
+            b1.SetBit(7);
+            REQUIRE(b1.GetMaxBit() == 7);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 0:
+                case 7:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("SetBit:0,7,255")
+        {
+            b1.SetBit(0);
+            b1.SetBit(7);
+            b1.SetBit(255);
+            REQUIRE(b1.GetMaxBit() == 255);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 0:
+                case 7:
+                case 255:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("SetBit:0,7,255 and ClrBit:1")
+        {
+            b1.SetBit(0);
+            b1.SetBit(7);
+            b1.SetBit(255);
+            b1.ClrBit(1);
+            REQUIRE(b1.GetMaxBit() == 255);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 0:
+                case 7:
+                case 255:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("SetBit:0,7,255 and ClrBit:7")
+        {
+            b1.SetBit(0);
+            b1.SetBit(7);
+            b1.SetBit(255);
+            b1.ClrBit(7);
+            REQUIRE(b1.GetMaxBit() == 255);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 0:
+                case 255:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("SetBit:0,7,255 and ClrBit:7,255")
+        {
+            b1.SetBit(0);
+            b1.SetBit(7);
+            b1.SetBit(255);
+            b1.ClrBit(7);
+            b1.ClrBit(255);
+            REQUIRE(b1.GetMaxBit() == 0);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 0:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("SetBit:0,7,255 and ClrBit:7,255,0")
+        {
+            b1.SetBit(0);
+            b1.SetBit(7);
+            b1.SetBit(255);
+            b1.ClrBit(7);
+            b1.ClrBit(255);
+            b1.ClrBit(0);
+            REQUIRE(b1.GetMaxBit() == -1);
+            for (int i = 0; i < 256; i++)
+            {
+                REQUIRE(b1.GetBit(i) == false);
+            }
+        }
+
+        SECTION("SetBit=8,16,63")
+        {
+            b1.SetBit(8);
+            b1.SetBit(16);
+            b1.SetBit(63);
+            REQUIRE(b1.GetMaxBit() == 63);
+            for (int i = 0; i < 256; i++)
+            {
+                switch (i)
+                {
+                case 8:
+                case 16:
+                case 63:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+
+        SECTION("b1.ClrAll")
+        {
+            b1.ClrAll();
+            REQUIRE(b1.GetMaxBit() == -1);
+            for (int i = 0; i < 256; i++)
+            {
+                REQUIRE(b1.GetBit(i) == false);
+            }
+        }
+
+        SECTION("b2=72-bit.SetBit(0,1,7,8,31,32,63)")
+        {
+            Bits b2;
+            b2.Init(72);
+            b2.SetBit(0);
+            b2.SetBit(1);
+            b2.SetBit(7);
+            b2.SetBit(8);
+            b2.SetBit(31);
+            b2.SetBit(32);
+            b2.SetBit(63);
+            REQUIRE(b2.GetMaxBit() == 63);
+            for (int i = 0; i < b2.Size(); i++)
+            {
+                switch (i)
+                {
+                case 0:
+                case 1:
+                case 7:
+                case 8:
+                case 31:
+                case 32:
+                case 63:
+                    REQUIRE(b2.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b2.GetBit(i) == false);
+                    break;
+                }
+            }
+            b1.Clone(b2);
+            REQUIRE(b1.GetMaxBit() == 63);
+            REQUIRE(b1.Size() == b2.Size());
+            for (int i = 0; i < b1.Size(); i++)
+            {
+                switch (i)
+                {
+                case 0:
+                case 1:
+                case 7:
+                case 8:
+                case 31:
+                case 32:
+                case 63:
+                    REQUIRE(b1.GetBit(i) == true);
+                    break;
+                default:
+                    REQUIRE(b1.GetBit(i) == false);
+                    break;
+                }
+            }
+        }
+    }
+#endif
+
+#endif
