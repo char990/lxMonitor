@@ -5,6 +5,7 @@
 #include <cstring>
 #include <module/DebugConsole.h>
 #include <module/Epoll.h>
+#include <camera/Camera.h>
 
 const Command DebugConsole::CMD_LIST[] = {
     {"?",
@@ -19,6 +20,9 @@ const Command DebugConsole::CMD_LIST[] = {
     {"ws",
      "Set websocket hexdump ON/OFF",
      DebugConsole::Cmd_ws},
+    {"shoot",
+     "take photo by camera f|m|b",
+     DebugConsole::Cmd_shoot},
 };
 
 DebugConsole::DebugConsole()
@@ -150,4 +154,28 @@ void DebugConsole::Cmd_ws(int argc, char *argv[])
 {
     printf("Set websocket hexdump %s\n", ws_hexdump ? "OFF" : "ON");
     ws_hexdump = !ws_hexdump;
+}
+
+void DebugConsole::Cmd_shoot(int argc, char *argv[])
+{
+    if (argc == 2)
+    {
+        char c;
+        if (sscanf(argv[1], "%c", &c) == 1)
+        {
+            switch(c)
+            {
+                case 'f':
+                camera1->TakePhoto();
+                return;
+                case 'm':
+                camera3->TakePhoto();
+                return;
+                case 'b':
+                camera2->TakePhoto();
+                return;
+            }
+        }
+    }
+    printf("Wrong argument\nTry 'shoot f|m|b'\n");
 }

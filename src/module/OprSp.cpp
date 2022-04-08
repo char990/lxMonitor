@@ -25,7 +25,7 @@ OprSp::OprSp(uint8_t comX, int bps, int rxbufsize, IRxCallback *rxCallback)
     events = EPOLLIN | EPOLLRDHUP;
     eventFd = sp->GetFd();
     Epoll::Instance().AddEvent(this, events);
-    if(rxCallback==nullptr)
+    if (rxCallback == nullptr)
     {
         rxRingBuf = new RingBuf(1024);
     }
@@ -36,7 +36,7 @@ OprSp::~OprSp()
     Epoll::Instance().DeleteEvent(this, events);
     sp->Close();
     delete sp;
-    if(rxRingBuf!=nullptr)
+    if (rxRingBuf != nullptr)
     {
         delete rxRingBuf;
     }
@@ -47,7 +47,7 @@ OprSp::~OprSp()
 /// \brief  Called by upperLayer
 bool OprSp::IsTxReady()
 {
-    return IsTxRdy();
+    return IsTxFree();
 }
 
 /// \brief  Called by upperLayer
@@ -92,7 +92,7 @@ int OprSp::RxHandle()
     int n = read(eventFd, buf, 4096);
     if (n > 0)
     {
-        if (IsTxRdy()) // if tx is busy, discard this rx
+        if (IsTxFree()) // if tx is busy, discard this rx
         {
             if (rxCallback != nullptr)
             {
@@ -109,6 +109,14 @@ int OprSp::RxHandle()
         }
     }
     return 0;
+}
+
+void OprSp::ClearRx()
+{
+    if (rxRingBuf != nullptr)
+    {
+        rxRingBuf->Reset();
+    }
 }
 
 int OprSp::ReOpen()

@@ -32,5 +32,6 @@ extern GpioOut * pPinWdt;
 extern GpioOut * pPinRelay;
 extern GpioOut * pPinMosfet1;
 extern GpioOut * pPinMosfet2;
+
 extern GpioOut * pOutput[3];
 

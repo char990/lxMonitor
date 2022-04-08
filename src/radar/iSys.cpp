@@ -141,14 +141,14 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 		pData += 1;
 		// Velocity
 		v.speed = Cnvt::GetS16hl(pData) * 3600 / 100000; // 0.01m/s -> km/h;
-		pData+=2;
+		pData += 2;
 		// Range: 4004 & 6003 => -32.768 … 32.767 [m]; others => -327.68 … 327.67 [m]
 		v.range = Cnvt::GetS16hl(pData) / ((code == 4004 || code == 6003) ? 1000 : 100); // cm/mm => m
-		pData+=2;
+		pData += 2;
 		// angle
 		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
-		pData+=2;
-		if (v.signal >= MIN_SIGNAL && v.speed >= MIN_SPEED && v.range >= MIN_RANGE)
+		pData += 2;
+		if (v.signal >= uciradar.minSignal && v.speed >= uciradar.minSpeed && v.range >= uciradar.minRange)
 		{
 			cnt++;
 		}
@@ -196,7 +196,7 @@ int TargetList::SaveTarget(const char *comment)
 		switch (flag)
 		{
 		case -1:
-			csv.SaveRadarMeta(time, "Invalid taget list", nullptr);
+			//csv.SaveRadarMeta(time, "Invalid taget list", nullptr);
 			break;
 		case 0:
 			if (hasVehicle)
@@ -206,7 +206,7 @@ int TargetList::SaveTarget(const char *comment)
 			}
 			break;
 		case 0xFF:
-			csv.SaveRadarMeta(time, "Clipping", nullptr);
+			//csv.SaveRadarMeta(time, "Clipping", nullptr);
 			break;
 		}
 	}
@@ -221,7 +221,7 @@ int TargetList::SaveTarget(const char *comment)
 
 int TargetList::Print(char *buf)
 {
-	int len = sprintf(buf, "%d:", cnt);
+	int len = sprintf(buf, "%d", cnt);
 	for (int i = 0; i < cnt; i++)
 	{
 		len += vehicles[i].Print(buf + len);
@@ -237,7 +237,7 @@ int TargetList::Print()
 }
 
 iSys400x::iSys400x(UciRadar &uciradar)
-	: IRadar(uciradar), targetlist(uciradar.name, uciradar.radarCode)
+	: IRadar(uciradar), targetlist(uciradar)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::READY;
@@ -250,7 +250,9 @@ iSys400x::~iSys400x()
 
 void iSys400x::SendSd2(const uint8_t *p, int len)
 {
-	uint8_t buf[6];
+	uint8_t *buf = new uint8_t[6 + len + 2];
+#if 0
+	// this piece of code makes system reboot
 	buf[0] = ISYS_FRM_CTRL_SD2;
 	buf[1] = len + 2;
 	buf[2] = len + 2;
@@ -268,6 +270,25 @@ void iSys400x::SendSd2(const uint8_t *p, int len)
 	buf[0] = c;
 	buf[1] = ISYS_FRM_CTRL_ED;
 	oprSp->Tx(buf, 2);
+#else
+	buf[0] = ISYS_FRM_CTRL_SD2;
+	buf[1] = len + 2;
+	buf[2] = len + 2;
+	buf[3] = ISYS_FRM_CTRL_SD2;
+	buf[4] = ISYS_SLAVE_ADDR;
+	buf[5] = ISYS_MASTER_ADDR;
+	memcpy(buf + 6, p, len);
+	char c = buf[4] + buf[5];
+	for (int i = 0; i < len; i++)
+	{
+		c += *p;
+		p++;
+	}
+	buf[len + 6] = c;
+	buf[len + 7] = ISYS_FRM_CTRL_ED;
+	oprSp->Tx(buf, 6 + len + 2);
+#endif
+	delete[] buf;
 }
 
 bool iSys400x::VerifyCmdAck()
@@ -287,7 +308,7 @@ int iSys400x::ReadPacket()
 		int indexSD2 = -1;
 		for (int i = 0; i < len; i++)
 		{
-			if (buf[i] == ISYS_FRM_CTRL_SD2)
+			if (buf[i] == ISYS_FRM_CTRL_SD2 && indexSD2 < 0)
 			{
 				indexSD2 = i;
 			}
@@ -349,18 +370,20 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	{
 		do
 		{
+			CmdStopAcquisition();
+			tmrTaskRadar.Setms(100-1);
+			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			ClearRxBuf();
 			CmdStartAcquisition();
-			tmrTaskRadar.Setms(500);
+			tmrTaskRadar.Setms(100-1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 		} while (!VerifyCmdAck());
 		do
 		{
 			ClearRxBuf();
 			CmdReadTargetList();
-			tmrTaskRadar.Setms(100);
+			tmrTaskRadar.Setms(100-1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-
 			if (ReadPacket() > 0)
 			{
 				ReloadTmrssTimeout();
@@ -404,22 +427,22 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
         int packetLen;
         std::string name = std::string("iSys400x");
 
-        TargetList list1{name, 4002};
+        TargetList list1{name, 4001};
         list1.cnt = 1;
         list1.vehicles[0] = {60, 80, 150, 12};
 
-        TargetList list2{name, 4002};
+        TargetList list2{name, 4001};
         list2.cnt = 2;
         list2.vehicles[0] = {60, 80, 140, 12};
         list2.vehicles[1] = {61, 70, 150, 12};
 
-        TargetList list3{name, 4002};
+        TargetList list3{name, 4001};
         list3.cnt = 3;
         list3.vehicles[0] = {60, 80, 130, 12};
         list3.vehicles[1] = {61, 70, 140, 12};
         list3.vehicles[2] = {62, 60, 150, 12};
 
-        TargetList target{name, 4002};
+        TargetList target{name, 4001};
 
         SECTION("DecodeTargetFrame")
         {

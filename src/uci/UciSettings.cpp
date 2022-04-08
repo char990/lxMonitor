@@ -31,6 +31,11 @@ void UciSettings::LoadConfig()
 	int d;
 	struct uci_section *uciSec;
 
+	// Controller
+	SECTION = _Controller;
+	uciSec = GetSection(SECTION);
+	freeGiga = GetInt(uciSec, _FreeGiga, 1, 16, true);
+
 	// cloud
 	SECTION = _Cloud;
 	uciSec = GetSection(SECTION);
@@ -46,7 +51,6 @@ void UciSettings::LoadConfig()
 		uciSec = GetSection(SECTION);
 		auto &c = uciMonitor[i];
 		c.name = std::string(sectionBuf);
-		c.output = GetInt(uciSec, _Output, 1, 2, true);
 		str = GetStr(uciSec, _Distance);
 		int ibuf[DISTANCE_NUMBER];
 		int cnt = Cnvt::GetIntArray(str, DISTANCE_NUMBER, ibuf, 1, 999);
@@ -55,8 +59,8 @@ void UciSettings::LoadConfig()
 		{
 			c.distance.at(i) = ibuf[i];
 		}
-		const char * isys = GetStr(uciSec, _iSys);
-		const char * stalker = GetStr(uciSec, _Stalker);
+		const char *isys = GetStr(uciSec, _iSys);
+		const char *stalker = GetStr(uciSec, _Stalker);
 		// isys
 		uciSec = GetSection(isys);
 		c.iSys.name = std::string(isys);
@@ -65,15 +69,17 @@ void UciSettings::LoadConfig()
 		c.iSys.radarId = GetInt(uciSec, _RadarId, 2, 255, true); // 0 & 1 not allowed
 		c.iSys.radarMode = GetInt(uciSec, _RadarMode, INT_MIN, INT_MAX, true);
 		c.iSys.radarCode = GetInt(uciSec, _RadarCode, INT_MIN, INT_MAX, true);
+		c.iSys.rangeRise = GetInt(uciSec, _RangeRise, 1, 99, true);
+		c.iSys.rangeLast = GetInt(uciSec, _RangeLast, 1, 99, true);
+		c.iSys.minRange = GetInt(uciSec, _MinRange, 1, 99, true);
+		c.iSys.minSignal = GetInt(uciSec, _MinSignal, 1, 99, true);
+		c.iSys.minSpeed = GetInt(uciSec, _MinSpeed, 1, 99, true);
 
 		// stalker
 		uciSec = GetSection(stalker);
 		c.stalker.name = std::string(stalker);
 		c.stalker.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, COMPORT_SIZE);
 		c.stalker.radarBps = GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true);
-		c.stalker.radarId = GetInt(uciSec, _RadarId, 0, 255, true);
-		c.stalker.radarMode = GetInt(uciSec, _RadarMode, INT_MIN, INT_MAX, true);
-		c.stalker.radarCode = GetInt(uciSec, _RadarCode, INT_MIN, INT_MAX, true);
 	}
 
 	int rcom[4] = {
@@ -86,7 +92,7 @@ void UciSettings::LoadConfig()
 	{
 		for (int j = i + 1; j < 4; j++)
 		{
-			if (rcom[i]==rcom[j])
+			if (rcom[i] == rcom[j])
 			{
 				throw std::invalid_argument(FmtException("RadarPort error : 2 radars on same port : %s", COM_NAME[rcom[i]]));
 			}
@@ -103,18 +109,20 @@ void UciSettings::Dump()
 	printf("%s/%s\n", PATH, PACKAGE);
 	char buf[1024];
 
+	printf("%s:\n", _Controller);
+	PrintOption_d(_FreeGiga, freeGiga);
+
 	printf("%s:\n", _Cloud);
 	PrintOption_str(_Ip, uciCloud.ip.c_str());
 	PrintOption_d(_Port, uciCloud.port);
 	PrintOption_str(_Site, uciCloud.site.c_str());
-	
+
 	for (int i = 0; i < 2; i++)
 	{
 		auto &c = uciMonitor[i];
 		printf("%s:\n", c.name.c_str());
 		PrintOption_str(_iSys, c.iSys.name.c_str());
 		PrintOption_str(_Stalker, c.stalker.name.c_str());
-		PrintOption_d(_Output, c.output);
 		int len = 0;
 		for (int i = 0; i < c.distance.size(); i++)
 		{
@@ -133,7 +141,36 @@ void UciSettings::PrintRadar(UciRadar &radar)
 	printf("%s:\n", radar.name.c_str());
 	PrintOption_str(_RadarPort, COM_NAME[radar.radarPort]);
 	PrintOption_d(_RadarBps, radar.radarBps);
-	PrintOption_d(_RadarId, radar.radarId);
-	PrintOption_d(_RadarMode, radar.radarMode);
-	PrintOption_d(_RadarCode, radar.radarCode);
+	if (radar.radarId >= 0)
+	{
+		PrintOption_d(_RadarId, radar.radarId);
+	}
+	if (radar.radarMode >= 0)
+	{
+		PrintOption_d(_RadarMode, radar.radarMode);
+	}
+	if (radar.radarCode >= 0)
+	{
+		PrintOption_d(_RadarCode, radar.radarCode);
+	}
+	if (radar.rangeLast >= 0)
+	{
+		PrintOption_d(_RangeLast, radar.rangeLast);
+	}
+	if (radar.rangeRise >= 0)
+	{
+		PrintOption_d(_RangeRise, radar.rangeRise);
+	}
+	if (radar.minRange >= 0)
+	{
+		PrintOption_d(_MinRange, radar.minRange);
+	}
+	if (radar.minSpeed >= 0)
+	{
+		PrintOption_d(_MinSpeed, radar.minSpeed);
+	}
+	if (radar.minSignal >= 0)
+	{
+		PrintOption_d(_MinSignal, radar.minSignal);
+	}
 }

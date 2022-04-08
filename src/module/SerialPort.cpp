@@ -54,7 +54,7 @@ int SerialPort::Open()
 
 	// O_RDONLY for read-only, O_WRONLY for write only, O_RDWR for both read/write access
 	// 3rd, optional parameter is mode_t mode
-	spFileDesc = open(spConfig.dev, O_RDWR | O_NOCTTY | O_NONBLOCK);
+	spFileDesc = open(spConfig.dev, O_RDWR | /*O_NOCTTY |*/ O_NONBLOCK);
 	// Check status
 	if (spFileDesc == -1)
 	{
@@ -68,7 +68,7 @@ void SerialPort::ConfigureTermios()
 {
 	//================== CONFIGURE ==================//
 	struct termios tty;
-	memset(&tty, 0, sizeof(tty));
+	bzero(&tty, sizeof(tty));
 	// Get current settings (will be stored in termios structure)
 	if (tcgetattr(spFileDesc, &tty) != 0)
 	{

@@ -9,9 +9,15 @@ class IOperator : public IGcEvent
 {
 public:
     IOperator() : IOperator(OPTXBUF_SIZE){};
-    IOperator(int buf_size) : txRingBuf(buf_size){};
-    virtual ~IOperator() {};
-    bool IsTxRdy() { return txRingBuf.Cnt()==0 && txsize == 0; };
+    IOperator(int buf_size) : txbufsize(buf_size) , txRingBuf(buf_size)
+    {
+         txbuf = new uint8_t[txbufsize]; 
+    };
+    //    IOperator(int buf_size) : txRingBuf(buf_size){};
+
+    virtual ~IOperator() { delete[] txbuf; };
+    //    virtual ~IOperator() {};
+    bool IsTxFree();
 
     int TxBytes(const uint8_t *data, int len);
     int TxHandle();
@@ -23,4 +29,9 @@ protected:
     int txsize{0};
     int txcnt{0};
     RingBuf txRingBuf;
+
+    int txbufsize;
+    uint8_t *txbuf;
+    uint8_t *ptx;
+    int cnt{0};
 };

@@ -7,6 +7,11 @@
 #include <vector>
 #include <sys/time.h>
 
+#define GIGA(x) (x * 1024 * 1024 * 1024ULL)
+#define MEGA(x) (x * 1024 * 1024UL)
+#define KILO(x) (x * 1024UL)
+#define SEC_PER_DAY (24 * 3600)
+
 namespace Utils
 {
     enum class STATE3

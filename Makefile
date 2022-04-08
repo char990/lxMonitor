@@ -39,7 +39,7 @@ $(APP_DIR)/$(TARGET): $(OBJECTS)
 .PHONY: all build clean debug release info
 
 build:
-	@touch $(SRC_ROOT)/main.cpp
+	@touch $(SRC_ROOT)/Version.cpp
 	@mkdir -p $(APP_DIR)
 	@mkdir -p $(OBJ_DIR)
 

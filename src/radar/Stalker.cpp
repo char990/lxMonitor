@@ -128,7 +128,7 @@ void VehicleList::PushDgb1(const char *dbg1)
         }
         else
         {
-            SaveDBG1(dbg1, "Invalid DBG1");
+            // SaveDBG1(dbg1, "Invalid DBG1");
         }
     }
 }

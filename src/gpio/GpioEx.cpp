@@ -220,15 +220,16 @@ void GpioEx::SetEdge(EDGE edge)
 		p = "none";
 		break;
 	}
+	_edge = edge;
 	snprintf(buf, sizeof(buf) - 1, SYSFS_GPIO_DIR "/gpio%d/edge", _pin);
 	fd = open(buf, O_WRONLY);
 	if (fd < 0)
 	{
-		throw std::runtime_error(FmtException("Can't open \"edge\" for pin %d\n", _pin));
+		printf("Can't open \"edge\" for pin %d\n", _pin);
+		return;
 	}
 	write(fd, p, strlen(p) + 1);
 	close(fd);
-	_edge = edge;
 }
 
 /****************************************************************

@@ -4,6 +4,7 @@
 #include <module/MyDbg.h>
 #include <module/BootTimer.h>
 #include <uci/UciSettings.h>
+#include <module/Utils.h>
 
 namespace Radar
 {
@@ -20,7 +21,7 @@ namespace Radar
     class IRadar : public IRxCallback
     {
     public:
-        IRadar(UciRadar &uciradar) : uciradar(uciradar){};
+        IRadar(UciRadar &uciradar) : uciradar(uciradar) { ReloadTmrssTimeout(); };
         virtual int RxCallback(uint8_t *buf, int len) = 0;
         virtual RadarStatus GetStatus()
         {
@@ -31,7 +32,7 @@ namespace Radar
             if (radarStatus == RadarStatus::NO_CONNECTION)
             {
                 // NO_CONNECTION
-                if (IsConnected())
+                if (isConnected != Utils::STATE3::S3_0)
                 {
                     Connected(false);
                     PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
@@ -39,10 +40,10 @@ namespace Radar
             }
             else if (radarStatus == RadarStatus::EVENT)
             {
-                if (!IsConnected())
+                if (isConnected != Utils::STATE3::S3_1)
                 {
                     Connected(true);
-                    PrintDbg(DBG_LOG, "%s connected", uciradar.name.c_str());
+                    PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
                 }
             }
             return radarStatus;
@@ -52,13 +53,15 @@ namespace Radar
         virtual bool TaskRadarPoll() = 0;
         UciRadar &uciradar;
 
-        bool IsConnected() { return (radarFlag & RADAR_CONNECTED) != 0; };
-        void Connected(bool c) { SetFlag(c, RADAR_CONNECTED); };
+        bool IsConnected() { return isConnected == Utils::STATE3::S3_1; };
+        void Connected(bool c) { isConnected = c ? Utils::STATE3::S3_1 : Utils::STATE3::S3_0; };
 
     protected:
         void SetFlag(bool c, const uint8_t vb);
         uint8_t radarFlag{0};
         static const uint8_t RADAR_CONNECTED{1 << 0};
+
+        Utils::STATE3 isConnected{Utils::STATE3::S3_NA};
 
         OprSp *oprSp{nullptr};
         RadarStatus radarStatus{RadarStatus::POWER_UP};

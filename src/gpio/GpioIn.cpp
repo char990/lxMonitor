@@ -13,7 +13,7 @@ GpioIn *pPinIn1=nullptr;
 GpioIn *pPinIn2=nullptr;
 GpioIn *pPinIn3=nullptr;
 
-GpioIn * pInput[3]={pPinIn1, pPinIn2, pPinIn3};
+GpioIn * pInput[3];
 
 GpioIn::GpioIn(int true_cnt, int false_cnt, unsigned int pin)
     : Debounce(true_cnt, false_cnt), gpioex(pin, GpioEx::DIR::INPUT), pin(pin)

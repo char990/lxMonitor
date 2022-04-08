@@ -16,7 +16,7 @@ GpioOut *pPinRelay=nullptr;
 GpioOut *pPinMosfet1=nullptr;
 GpioOut *pPinMosfet2=nullptr;
 
-GpioOut * pOutput[3]={pPinMosfet1, pPinMosfet2, pPinRelay};
+GpioOut * pOutput[3];
 
 GpioOut::GpioOut(unsigned int pin, bool init_value)
 :gpioex(pin,GpioEx::DIR::OUTPUT)

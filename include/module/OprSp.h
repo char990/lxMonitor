@@ -38,6 +38,7 @@ public:
 
     IRxCallback * rxCallback;
     RingBuf *rxRingBuf{nullptr};
+    void ClearRx();
 
 private:
     uint8_t comX;

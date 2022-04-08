@@ -6,10 +6,9 @@
 
 using namespace Radar;
 
-Monitor::Monitor(int id)
-    : id(id), uciMonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1])
+Monitor::Monitor(int id, Camera *camera, Camera *camera3)
+    : id(id), camera(camera), camera3(camera3), uciMonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1])
 {
-    camera = new Camera(id);
     stalker = new Stalker::StalkerStat(uciMonitor.stalker);
     isys400x = new iSys::iSys400x(uciMonitor.iSys);
 }
@@ -18,7 +17,6 @@ Monitor::~Monitor()
 {
     delete stalker;
     delete isys400x;
-    delete camera;
 }
 
 void Monitor::PeriodicRun()
@@ -37,26 +35,39 @@ void Monitor::PeriodicRun()
             camera->TakePhoto();
         }
     }
-
     // ----------------- iSYS400x -----------------
     isys400x->TaskRadarPoll();
     st = isys400x->GetStatus();
     if (st == RadarStatus::EVENT)
     {
         isys400x->SetStatus(RadarStatus::READY);
-        // check distance
-        if(CheckRange())
+        if (1)//stalker->vehicleList.vlist.size() > 0)
+        // only there is vehicle in stalker, in order to filter the noise for iSys400x 
         {
-            camera->TakePhoto();
-            isys400x->SaveTarget(PHOTO_TAKEN);
-        }
-        else
-        {
-            isys400x->SaveTarget(nullptr);
+            iSys::Vehicle v {75, 3, 2, 0};
+            isys400x->minRangeVehicle = &v;
+            // check distance
+            if (CheckRange())
+            {
+                camera->TakePhoto();
+                isys400x->SaveTarget(PHOTO_TAKEN);
+            }
+            else
+            {
+                isys400x->SaveTarget(nullptr);
+            }
         }
     }
-    // ----------------- camera -----------------
-    camera->PeriodicRun();
+
+    // ----------------- own camera -----------------
+    // camera3
+    if (camera3 != nullptr)
+    {
+        auto c3 = camera3->Alarm();
+        if (c3->IsHigh())
+        {
+        }
+    }
 }
 
 bool Monitor::CheckRange()
@@ -66,23 +77,24 @@ bool Monitor::CheckRange()
     {
         return false;
     }
-    if (tmrRange.IsExpired() || (v->range > (lastRange + 3) && v->range <50))
+    if (tmrRange.IsExpired() || (v->range > (lastRange + uciMonitor.iSys.rangeRise) && lastRange < uciMonitor.iSys.rangeLast))
     {
         TaskRangeReSet();
     }
+    if(v->range >= (lastRange - 1))
+    {
+        // this is noise
+        return false;
+    }
     lastRange = v->range;
-    if(lastRange > uciMonitor.distance[uciRangeIndex])
+    if (uciRangeIndex >= uciMonitor.distance.size() || lastRange > uciMonitor.distance[uciRangeIndex])
     {
         return false;
     }
     // should take a photo
-    do
+    while (uciRangeIndex < uciMonitor.distance.size() && lastRange <= uciMonitor.distance[uciRangeIndex])
     {
-        if ( ++ uciRangeIndex >= uciMonitor.distance.size())
-        { // last
-            TaskRangeReSet();
-            break;
-        }
-    }while(lastRange < uciMonitor.distance[uciRangeIndex]);
+        uciRangeIndex++;
+    };
     return true;
 }

@@ -10,7 +10,7 @@
 class Monitor : public IPeriodicRun
 {
 public:
-    Monitor(int id); // id is 1/2
+    Monitor(int id, Camera *camera, Camera *camera3); // id is 1/2
     ~Monitor();
 
     // Add this to 100ms timer event, so PeriodicRun() will be called every 100ms
@@ -22,15 +22,17 @@ private:
     Radar::iSys::iSys400x *isys400x;
     Radar::Stalker::StalkerStat *stalker;
     Camera *camera;
+    Camera *camera3;
 
     /*********************CheckRange********************/
     bool CheckRange();
     void TaskRangeReSet()
     {
+        lastRange = 0;
         uciRangeIndex = 0;
         tmrRange.Setms(60000);
     };
     BootTimer tmrRange;
-    int16_t lastRange{-1};
+    int16_t lastRange{0};
     int uciRangeIndex{0};
 };

@@ -44,10 +44,10 @@ namespace Radar
         class TargetList
         {
         public:
-            TargetList(std::string &name, int code) : name(name), code(code), csv(name + "Tlist"){};
+            TargetList(UciRadar &uciradar) : uciradar(uciradar), csv(uciradar.name + "Target"){};
             int flag{0}; // return of DecodeTargetFrame
             int cnt{0};
-            Vehicle vehicles[MAX_TARGETS];
+            std::vector<Vehicle> vehicles{MAX_TARGETS};
 
             /// \brief  decodes target list frame received from iSYS device - Note: only 16-bit.
             /// \return -1:Error; 0:NO target; 1-MAX:number of target
@@ -64,7 +64,7 @@ namespace Radar
         private:
             int code;
             bool hasVehicle{false};
-            std::string &name;
+            UciRadar &uciradar;
             SaveCSV csv;
             struct timeval time
             {
@@ -107,7 +107,7 @@ namespace Radar
             /// \return packet length
             int ReadPacket();
 
-            void ClearRxBuf() { oprSp->rxRingBuf->Reset(); };
+            void ClearRxBuf() { oprSp->ClearRx(); };
         };
     }
 }

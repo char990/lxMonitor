@@ -5,6 +5,48 @@
 
 int IOperator::TxBytes(const uint8_t *data, int len)
 {
+    if (len > (txbufsize - cnt) || len == 0 || data == nullptr)
+    {
+        return 0;
+    }
+    if (cnt == 0)
+    {
+        int n = write(eventFd, data, len);
+        if (n < 0)
+        {
+            return -1;
+        }
+        else if (n < len)
+        {
+            cnt = len - n;
+            ptx = txbuf;
+            memcpy(txbuf, data + len, cnt);
+            events = EPOLLIN | EPOLLOUT | EPOLLRDHUP;
+            Epoll::Instance().ModifyEvent(this, events);
+        }
+    }
+    else
+    {
+        auto ppush = ptx + cnt;
+        if (ppush >= (txbuf + txbufsize))
+        {
+            ppush -= txbufsize;
+        }
+        int nb = txbuf + txbufsize - ppush; // left space to buf end
+        if (len <= nb)
+        {
+            memcpy(ppush, data, len);
+        }
+        else
+        {
+            memcpy(ppush, data, nb);
+            memcpy(txbuf, data + nb, len - nb);
+        }
+        cnt += len;
+    }
+    return len;
+
+    /*************/
     if (txRingBuf.Vacancy() < len || len <= 0 || eventFd < 0)
     {
         return -1;
@@ -45,10 +87,41 @@ void IOperator::ClrTx()
     txRingBuf.Reset();
     events = EPOLLIN | EPOLLRDHUP;
     Epoll::Instance().ModifyEvent(this, events);
+    cnt = 0;
 }
 
 int IOperator::TxHandle()
 {
+    if (cnt == 0)
+    {
+        ClrTx();
+        return 0;
+    }
+    else
+    {
+        int txlen = txbuf + txbufsize - ptx; // ptx to buf end
+        if (txlen > cnt)
+        {
+            txlen = cnt;
+        }
+        int n = write(eventFd, ptx, txlen);
+        if (n < 0)
+        {
+            ClrTx();
+            return -1;
+        }
+        cnt -= n;
+        if (cnt > 0)
+        {
+            ptx += n;
+            if (ptx >= (txbuf + txbufsize))
+            {
+                ptx -= txbufsize;
+            }
+        }
+    }
+    return cnt;
+    /*************/
     int r = 0;
     if (txcnt == txsize)
     {
@@ -78,3 +151,9 @@ int IOperator::TxHandle()
     }
     return r;
 }
+
+bool IOperator::IsTxFree()
+{
+//    return txRingBuf.Cnt() == 0 && txsize == 0;
+    return txRingBuf.Cnt() == 0 && txsize == 0;
+};

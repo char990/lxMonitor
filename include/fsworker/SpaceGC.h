@@ -9,19 +9,24 @@
 class SpaceGC : public IPeriodicRun
 {
 public:
-    SpaceGC()
-    {
-        CollectGarbage();
-    };
+    SpaceGC(unsigned int freeGiga):freeGiga(freeGiga){};
+
     virtual void PeriodicRun() override;
+    
+    void CollectGarbage();
+
+    int fake_bavail{0};        // this is for unit test. No use in real program
 
 private:
+    unsigned int freeGiga;
+
     time_t ts{0};
-    struct statvfs fiData;
+
+    struct statvfs vfsSt;
 
     int StatVfs();
 
-    void CollectGarbage();
-
     int PrintStatVfs(char *buf);
+
+    void RefreshVfsSt();
 };

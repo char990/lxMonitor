@@ -27,3 +27,7 @@ private:
     bool TaskTakePhoto(int *_ptLine);
     BootTimer tmrTakePhoto;
 };
+
+extern Camera * camera1;
+extern Camera * camera2;
+extern Camera * camera3;
