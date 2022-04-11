@@ -79,13 +79,13 @@ void LOG::ToString(char *buf)
 /**************************VIHICLE*************************/
 void VehicleList::PushDgb1(const char *dbg1)
 {
-    if (*dbg1 == '\0')
+    if (*dbg1 != '\0')
     { // no vehicle
         if (hasVehicle)
         {
             hasVehicle = false;
             gettimeofday(&time, nullptr);
-            SaveDBG1(dbg1);
+            //SaveDBG1(dbg1, NO_VEHICLE);
             vlist.clear(); // as there is no vhicle, clear all vehicles in list
             Print();
         }
@@ -164,14 +164,7 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
 
 int VehicleList::SaveDBG1(const char *dbg1, const char *comment)
 {
-    if (*dbg1 == '\0')
-    { // no vehicle
-        csv.SaveRadarMeta(time, "There is no vehicle\n", nullptr);
-    }
-    else
-    {
-        csv.SaveRadarMeta(time, dbg1, comment);
-    }
+    csv.SaveRadarMeta(time, comment, dbg1);
     return 0;
 }
 
@@ -209,6 +202,10 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
                 dbg1buf[dbg1len] = '\0';
                 vehicleList.PushDgb1((const char *)dbg1buf);
                 radarStatus = RadarStatus::EVENT;
+                if(dbg1len != 0 && vdebug)
+                {
+                    printf("%s\n", dbg1buf);
+                }
             }
             dbg1len = 0;
         }

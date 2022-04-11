@@ -196,34 +196,47 @@ int TargetList::SaveTarget(const char *comment)
 		switch (flag)
 		{
 		case -1:
-			//csv.SaveRadarMeta(time, "Invalid taget list", nullptr);
+			// csv.SaveRadarMeta(time, "Invalid taget list", nullptr);
 			break;
 		case 0:
 			if (hasVehicle)
 			{
 				hasVehicle = false;
-				csv.SaveRadarMeta(time, "There is no vehicle", nullptr);
+				//csv.SaveRadarMeta(time, NO_VEHICLE, nullptr);
 			}
 			break;
 		case 0xFF:
-			//csv.SaveRadarMeta(time, "Clipping", nullptr);
+			// csv.SaveRadarMeta(time, "Clipping", nullptr);
 			break;
 		}
 	}
 	else
 	{
+		hasVehicle = true;
 		char xbuf[1024];
-		Print(xbuf);
-		csv.SaveRadarMeta(time, xbuf, comment);
+		xbuf[0] = 0;
+		if (uciradar.radarMode == 0)
+		{
+			Print(xbuf);
+		}
+		else if (uciradar.radarMode == 1)
+		{
+			minRangeVehicle->Print(xbuf);
+		}
+		csv.SaveRadarMeta(time, comment, xbuf);
 	}
 	return 0;
 }
 
 int TargetList::Print(char *buf)
 {
-	int len = sprintf(buf, "%d", cnt);
+	int len = 0; // sprintf(buf, "%d", cnt);
 	for (int i = 0; i < cnt; i++)
 	{
+		if (i > 0)
+		{
+			buf[len++] = ',';
+		}
 		len += vehicles[i].Print(buf + len);
 	}
 	return len;
@@ -234,6 +247,19 @@ int TargetList::Print()
 	char buf[1024];
 	Print(buf);
 	return printf("%s\n", buf);
+}
+
+void TargetList::Refresh()
+{
+	minRangeVehicle = &vehicles[0];
+	for (int i = 1; i < cnt; i++)
+	{
+		auto &v = vehicles[i];
+		if (v.range < minRangeVehicle->range)
+		{
+			minRangeVehicle = &vehicles[i];
+		}
+	}
 }
 
 iSys400x::iSys400x(UciRadar &uciradar)
@@ -252,24 +278,24 @@ void iSys400x::SendSd2(const uint8_t *p, int len)
 {
 	uint8_t *buf = new uint8_t[6 + len + 2];
 #if 0
-	// this piece of code makes system reboot
-	buf[0] = ISYS_FRM_CTRL_SD2;
-	buf[1] = len + 2;
-	buf[2] = len + 2;
-	buf[3] = ISYS_FRM_CTRL_SD2;
-	buf[4] = ISYS_SLAVE_ADDR;
-	buf[5] = ISYS_MASTER_ADDR;
-	oprSp->Tx(buf, 6);
-	oprSp->Tx(p, len);
-	char c = buf[4] + buf[5];
-	for (int i = 0; i < len; i++)
-	{
-		c += *p;
-		p++;
-	}
-	buf[0] = c;
-	buf[1] = ISYS_FRM_CTRL_ED;
-	oprSp->Tx(buf, 2);
+		// this piece of code makes system reboot
+		buf[0] = ISYS_FRM_CTRL_SD2;
+		buf[1] = len + 2;
+		buf[2] = len + 2;
+		buf[3] = ISYS_FRM_CTRL_SD2;
+		buf[4] = ISYS_SLAVE_ADDR;
+		buf[5] = ISYS_MASTER_ADDR;
+		oprSp->Tx(buf, 6);
+		oprSp->Tx(p, len);
+		char c = buf[4] + buf[5];
+		for (int i = 0; i < len; i++)
+		{
+			c += *p;
+			p++;
+		}
+		buf[0] = c;
+		buf[1] = ISYS_FRM_CTRL_ED;
+		oprSp->Tx(buf, 2);
 #else
 	buf[0] = ISYS_FRM_CTRL_SD2;
 	buf[1] = len + 2;
@@ -371,18 +397,19 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 		do
 		{
 			CmdStopAcquisition();
-			tmrTaskRadar.Setms(100-1);
+			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			ClearRxBuf();
 			CmdStartAcquisition();
-			tmrTaskRadar.Setms(100-1);
+			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 		} while (!VerifyCmdAck());
+		ReloadTmrssTimeout();
 		do
 		{
 			ClearRxBuf();
 			CmdReadTargetList();
-			tmrTaskRadar.Setms(100-1);
+			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if (ReadPacket() > 0)
 			{
@@ -392,25 +419,33 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				if (x == 0 || x == 0xFF)
 				{
 					radarStatus = RadarStatus::EVENT;
-					minRangeVehicle = nullptr;
+					targetlist.minRangeVehicle = nullptr;
 				}
 				else if (x > 0)
 				{
-					minRangeVehicle = &targetlist.vehicles[0];
-					for (int i = 1; i < targetlist.cnt; i++)
-					{
-						auto &v = targetlist.vehicles[i];
-						if (v.range < minRangeVehicle->range)
-						{
-							minRangeVehicle = &targetlist.vehicles[i];
-						}
-					}
+					targetlist.Refresh();
 					radarStatus = RadarStatus::EVENT;
 				}
 			}
 		} while (GetStatus() != RadarStatus::NO_CONNECTION);
 	};
 	PT_END();
+}
+
+int iSys400x::SaveTarget(const char *comment)
+{
+	if (vdebug)
+	{
+		if (targetlist.minRangeVehicle != nullptr && (uciradar.radarMode & 1) == 0)
+		{
+			targetlist.minRangeVehicle->Print();
+			if (comment != nullptr && comment[0] != '\0')
+			{
+				printf("\t\t\t%s\n", comment);
+			}
+		}
+	}
+	return targetlist.SaveTarget(comment);
 }
 
 #if 0
@@ -421,46 +456,46 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 #include <unistd.h>
 #include <3rdparty/catch2/catch.hpp>
 
-    TEST_CASE("Class iSys400x", "[iSys400x]")
-    {
-        uint8_t packet[MAX_PACKET_SIZE];
-        int packetLen;
-        std::string name = std::string("iSys400x");
+		TEST_CASE("Class iSys400x", "[iSys400x]")
+		{
+			uint8_t packet[MAX_PACKET_SIZE];
+			int packetLen;
+			std::string name = std::string("iSys400x");
 
-        TargetList list1{name, 4001};
-        list1.cnt = 1;
-        list1.vehicles[0] = {60, 80, 150, 12};
+			TargetList list1{name, 4001};
+			list1.cnt = 1;
+			list1.vehicles[0] = {60, 80, 150, 12};
 
-        TargetList list2{name, 4001};
-        list2.cnt = 2;
-        list2.vehicles[0] = {60, 80, 140, 12};
-        list2.vehicles[1] = {61, 70, 150, 12};
+			TargetList list2{name, 4001};
+			list2.cnt = 2;
+			list2.vehicles[0] = {60, 80, 140, 12};
+			list2.vehicles[1] = {61, 70, 150, 12};
 
-        TargetList list3{name, 4001};
-        list3.cnt = 3;
-        list3.vehicles[0] = {60, 80, 130, 12};
-        list3.vehicles[1] = {61, 70, 140, 12};
-        list3.vehicles[2] = {62, 60, 150, 12};
+			TargetList list3{name, 4001};
+			list3.cnt = 3;
+			list3.vehicles[0] = {60, 80, 130, 12};
+			list3.vehicles[1] = {61, 70, 140, 12};
+			list3.vehicles[2] = {62, 60, 150, 12};
 
-        TargetList target{name, 4001};
+			TargetList target{name, 4001};
 
-        SECTION("DecodeTargetFrame")
-        {
-            int x;
-            list1.MakeTargetMsg(packet, &packetLen);
-            x = target.DecodeTargetFrame(packet, packetLen);
-			target.Print();
-            REQUIRE(x == 1);
-            list2.MakeTargetMsg(packet, &packetLen);
-            x = target.DecodeTargetFrame(packet, packetLen);
-			target.Print();
-            REQUIRE(x == 2);
-            list3.MakeTargetMsg(packet, &packetLen);
-            x = target.DecodeTargetFrame(packet, packetLen);
-			target.Print();
-            REQUIRE(x == 3);
-        }
-    }
+			SECTION("DecodeTargetFrame")
+			{
+				int x;
+				list1.MakeTargetMsg(packet, &packetLen);
+				x = target.DecodeTargetFrame(packet, packetLen);
+				target.Print();
+				REQUIRE(x == 1);
+				list2.MakeTargetMsg(packet, &packetLen);
+				x = target.DecodeTargetFrame(packet, packetLen);
+				target.Print();
+				REQUIRE(x == 2);
+				list3.MakeTargetMsg(packet, &packetLen);
+				x = target.DecodeTargetFrame(packet, packetLen);
+				target.Print();
+				REQUIRE(x == 3);
+			}
+		}
 
 #endif
 #endif

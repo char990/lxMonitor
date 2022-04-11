@@ -182,22 +182,22 @@ int main(int argc, char *argv[])
         }
 
         // Controller
-        auto controller = new Controller();
-        tmrEvt1000ms->Add(controller);
+        //auto controller = new Controller();
+        //tmrEvt1000ms->Add(controller);
 
         // Camera3
-        camera1 = new Camera(1);
-        tmrEvt100ms->Add(camera1);
-        camera2 = new Camera(2);
-        tmrEvt100ms->Add(camera2);
-        camera3 = new Camera(3);
-        tmrEvt100ms->Add(camera3);
+        cameras[0] = new Camera(1);
+        tmrEvt100ms->Add(cameras[0]);
+        cameras[1] = new Camera(2);
+        tmrEvt100ms->Add(cameras[1]);
+        cameras[2] = new Camera(3);
+        tmrEvt100ms->Add(cameras[2]);
         
         // monitor
-        auto monitor1 = new Monitor(1, camera1, camera3);
-        tmrEvt10ms->Add(monitor1);
-        // auto monitor2 = new Monitor(2, camera3, nullptr);
-        // tmrEvt10ms->Add(monitor2);
+        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
+        tmrEvt10ms->Add(monitors[0]);
+        monitors[1] = new Monitor(2, cameras[1], nullptr);
+        //tmrEvt10ms->Add(monitors[1]);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");
         printf("\n=>Input '?<Enter>' to get console help.\n\n");

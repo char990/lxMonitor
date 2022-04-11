@@ -28,6 +28,4 @@ private:
     BootTimer tmrTakePhoto;
 };
 
-extern Camera * camera1;
-extern Camera * camera2;
-extern Camera * camera3;
+extern Camera * cameras[3];

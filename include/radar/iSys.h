@@ -37,8 +37,8 @@ namespace Radar
             int16_t speed;  // km/h
             int16_t range;  // m
             int16_t angle;  // deg
-            int Print() { return printf("isys400x:%dDB, %dKM/H, %dM, angle=%dDEG\n", signal, speed, range, angle); }
-            int Print(char *buf) { return sprintf(buf, "[S=%d V=%d R=%d A=%d]", signal, speed, range, angle); }
+            int Print() { return printf("S=%3d V=%3d R=%3d A=%3d\n", signal, speed, range, angle); }
+            int Print(char *buf) { return sprintf(buf, "S=%3d V=%3d R=%3d A=%3d", signal, speed, range, angle); }
         };
 
         class TargetList
@@ -61,6 +61,9 @@ namespace Radar
             int Print(char *buf);
             int Print();
 
+            void Refresh();
+            Vehicle *minRangeVehicle;
+
         private:
             int code;
             bool hasVehicle{false};
@@ -82,13 +85,11 @@ namespace Radar
 
             bool TaskRadarPoll() override { return TaskRadarPoll_(&taskRadar_); };
 
-            Vehicle *minRangeVehicle;
+            int SaveTarget(const char *comment);
 
-            int SaveTarget(const char *comment) { return targetlist.SaveTarget(comment); };
-
-        protected:
             TargetList targetlist;
 
+        protected:
             BootTimer tmrTaskRadar;
             int taskRadar_;
             bool TaskRadarPoll_(int *_ptLine);

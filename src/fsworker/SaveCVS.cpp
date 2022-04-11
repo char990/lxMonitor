@@ -14,6 +14,7 @@
 using namespace Utils;
 
 const char *PHOTO_TAKEN = "Photo taken";
+const char *NO_VEHICLE = "No vehicle";
 
 SaveCSV::SaveCSV(std::string filename)
     : filename(filename)
@@ -28,20 +29,20 @@ SaveCSV::~SaveCSV()
     }
 }
 
-int SaveCSV::SaveRadarMeta(struct timeval &time, const char *meta, const char *comment)
+int SaveCSV::SaveRadarMeta(struct timeval &time, const char *comment, const char *meta)
 {
-    char buf[32];
-    Time::ParseTimeToLocalStr(&time, buf);
+    char tstring[32];
+    Time::ParseTimeToLocalStr(&time, tstring);
     int cnt = 0;
     while (cnt++ < 2)
     {
-        if (memcmp(lastdate, buf, 10) != 0)
+        if (memcmp(lastdate, tstring, 10) != 0)
         {
             if (csvfd > 0)
             {
                 close(csvfd);
             }
-            memcpy(lastdate, buf, 10);
+            memcpy(lastdate, tstring, 10);
             lastdate[10] = 0;
             char date[9];
             date[0] = lastdate[6]; // year
@@ -77,14 +78,15 @@ int SaveCSV::SaveRadarMeta(struct timeval &time, const char *meta, const char *c
         {
             char xbuf[1024];
             int len;
-            if (comment != nullptr)
+            if (meta == nullptr || *meta == '\0')
             {
-                len = snprintf(xbuf, 1023, "%s,%s,%s\n", buf, meta, comment);
+                meta = " ";
             }
-            else
+            if (comment == nullptr || *comment == '\0')
             {
-                len = snprintf(xbuf, 1023, "%s,%s\n", buf, meta);
+                comment = " ";
             }
+            len = snprintf(xbuf, 1023, "%s,%s,%s\n", tstring, comment, meta);
             if (write(csvfd, xbuf, len) < 0)
             {
                 lastdate[0] = 0;

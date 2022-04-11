@@ -3,9 +3,7 @@
 #include <module/MyDbg.h>
 
 
-Camera * camera1;
-Camera * camera2;
-Camera * camera3;
+Camera * cameras[3];
 
 const char XCAM[]={'F', 'B', 'M'};
 
@@ -34,12 +32,12 @@ bool Camera::TaskTakePhoto(int *_ptLine)
         PT_WAIT_UNTIL(toTakePhoto == true);
         toTakePhoto = false;
         takephoto->SetPinHigh();
-        tmrTakePhoto.Setms(500);
-        PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
-        takephoto->SetPinLow();
-        tmrTakePhoto.Setms(500);
+        tmrTakePhoto.Setms(500-1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
         PrintDbg(DBG_PRT, "%cCAM-shot", XCAM[id-1]);
+        takephoto->SetPinLow();
+        tmrTakePhoto.Setms(500-1);
+        PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
     };
     PT_END();
 }
