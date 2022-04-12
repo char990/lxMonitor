@@ -12,6 +12,7 @@ public:
     ~Camera();
 
     void TakePhoto() { toTakePhoto = true; };
+    void ConTakePhoto() { toTakePhoto = true; conTakePhoto = true;};
 
     virtual void PeriodicRun() override;
 
@@ -22,7 +23,7 @@ private:
     GpioOut *takephoto;
     GpioIn *alarm;
     bool toTakePhoto{false};
-    
+    bool conTakePhoto{false};
     int taskTakePhotoLine{0};
     bool TaskTakePhoto(int *_ptLine);
     BootTimer tmrTakePhoto;

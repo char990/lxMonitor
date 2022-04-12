@@ -38,14 +38,14 @@ void Monitor::PeriodicRun()
         }
     }
     // ----------------- iSYS400x -----------------
-    isys400x->TaskRadarPoll();
-    st = isys400x->GetStatus();
-    if (st == RadarStatus::EVENT)
+    if (1) // stalker->vehicleList.vlist.size() > 0)
+    // only there is vehicle in stalker, in order to filter the noise for iSys400x
     {
-        isys400x->SetStatus(RadarStatus::READY);
-        if (1) // stalker->vehicleList.vlist.size() > 0)
-        // only there is vehicle in stalker, in order to filter the noise for iSys400x
+        isys400x->TaskRadarPoll();
+        st = isys400x->GetStatus();
+        if (st == RadarStatus::EVENT)
         {
+            isys400x->SetStatus(RadarStatus::READY);
             // check distance
             if (CheckRange())
             {
@@ -58,7 +58,10 @@ void Monitor::PeriodicRun()
             }
         }
     }
-
+    else
+    {
+        isys400x->TaskRadarPollReset();
+    }
     // ----------------- own camera -----------------
     // cameraM
     if (cameraM != nullptr)
@@ -72,16 +75,16 @@ void Monitor::PeriodicRun()
 
 bool Monitor::CheckRange()
 {
-    auto mode = isys400x->uciradar.radarMode & 1;
     iSys::Vehicle *v = isys400x->targetlist.minRangeVehicle;
-    if (v == nullptr)
+    if (v == nullptr || !isys400x->targetlist.IsClosing())
     {
         return false;
     }
-    if (tmrRange.IsExpired() || (v->range > (lastRange + uciMonitor.iSys.rangeRise) && lastRange < uciMonitor.iSys.rangeLast))
+    if (tmrRange.IsExpired() || (v->range > (lastRange + uciMonitor.iSys.rangeRise * 100) && lastRange < uciMonitor.iSys.rangeLast * 100))
     {
         TaskRangeReSet();
     }
+    /*
     else if (v->range >= lastRange)
     {
         // this is noise
@@ -90,9 +93,9 @@ bool Monitor::CheckRange()
             printf("\t\t\t\t\tFALSE 1: v->range=%d, lastRange=%d\n", v->range, lastRange);
         }
         return false;
-    }
+    }*/
     lastRange = v->range;
-    if (uciRangeIndex >= uciMonitor.distance.size() || lastRange > uciMonitor.distance[uciRangeIndex])
+    if (uciRangeIndex >= uciMonitor.distance.size() || lastRange > uciMonitor.distance[uciRangeIndex] * 100)
     {
         if (isys400x->Vdebug())
         {
@@ -101,7 +104,7 @@ bool Monitor::CheckRange()
         return false;
     }
     // should take a photo
-    while (uciRangeIndex < uciMonitor.distance.size() && lastRange <= uciMonitor.distance[uciRangeIndex])
+    while (uciRangeIndex < uciMonitor.distance.size() && lastRange <= uciMonitor.distance[uciRangeIndex] * 100)
     {
         uciRangeIndex++;
     };

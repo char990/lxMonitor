@@ -18,9 +18,9 @@ const Command DebugConsole::CMD_LIST[] = {
     {"ver",
      "Print version",
      DebugConsole::Cmd_ver},
-    {"ws",
+    /*{"ws",
      "Set websocket hexdump ON/OFF",
-     DebugConsole::Cmd_ws},
+     DebugConsole::Cmd_ws},*/
     {"shoot",
      "Take photo by camera f|m|b. Usage: shoot f|m|b",
      DebugConsole::Cmd_shoot},
@@ -173,13 +173,13 @@ void DebugConsole::Cmd_shoot(int argc, char *argv[])
             switch (c)
             {
             case 'f':
-                cameras[0]->TakePhoto();
+                cameras[0]->ConTakePhoto();
                 return;
             case 'm':
-                cameras[2]->TakePhoto();
+                cameras[2]->ConTakePhoto();
                 return;
             case 'b':
-                cameras[1]->TakePhoto();
+                cameras[1]->ConTakePhoto();
                 return;
             }
         }

@@ -111,6 +111,31 @@ const uint8_t read_target_list_16bit[] = {
 	// 16	Output of sint16_t variable types (16-Bit output)
 };
 
+void VehicleFilter::Push(struct timeval *time, int s, int r)
+{
+	memcpy(&items[0], &items[1], VF_SIZE * sizeof(VFItem));
+	items[VF_SIZE].usec = time->tv_sec * 1000000 + time->tv_usec;
+	items[VF_SIZE].speed = s;
+	items[VF_SIZE].range = r;
+	isColsing = false;
+	for (int i = 0; i < VF_SIZE; i++)
+	{
+		int usec = items[i + 1].usec - items[i].usec;
+		int cm = items[i + 1].range - items[i].range;
+		if (items[i].usec == 0 || usec > 500000 || cm > 0)
+		{
+			return;
+		}
+		int r = items[i].speed * usec / 36000;
+		cm = (cm > r) ? (cm - r) : (r - cm);
+		if (cm > cmErr)
+		{
+			return;
+		}
+	}
+	isColsing = true;
+};
+
 int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 {
 	cnt = 0;
@@ -142,13 +167,13 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 		// Velocity
 		v.speed = Cnvt::GetS16hl(pData) * 3600 / 100000; // 0.01m/s -> km/h;
 		pData += 2;
-		// Range: 4004 & 6003 => -32.768 … 32.767 [m]; others => -327.68 … 327.67 [m]
-		v.range = Cnvt::GetS16hl(pData) / ((code == 4004 || code == 6003) ? 1000 : 100); // cm/mm => m
+		// Range: 4004 & 6003 => -32768 … 32767 [mm]; others => -32768 … 32767 [cm]
+		v.range = Cnvt::GetS16hl(pData);
 		pData += 2;
 		// angle
 		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
 		pData += 2;
-		if (v.signal >= uciradar.minSignal && v.speed >= uciradar.minSpeed && v.range >= uciradar.minRange)
+		if (v.signal >= uciradar.minSignal && v.speed >= uciradar.minSpeed && v.range >= uciradar.minRange * 100)
 		{
 			cnt++;
 		}
@@ -174,7 +199,7 @@ void TargetList::MakeTargetMsg(uint8_t *buf, int *len)
 		auto &v = vehicles[i];
 		*ptr++ = v.signal;
 		ptr = Cnvt::PutU16(v.speed * 100000 / 3600, ptr);
-		ptr = Cnvt::PutU16(v.range * 100, ptr);
+		ptr = Cnvt::PutU16(v.range, ptr);
 		ptr = Cnvt::PutU16(v.angle * 100, ptr);
 	}
 	// chekcsum
@@ -202,7 +227,7 @@ int TargetList::SaveTarget(const char *comment)
 			if (hasVehicle)
 			{
 				hasVehicle = false;
-				//csv.SaveRadarMeta(time, NO_VEHICLE, nullptr);
+				// csv.SaveRadarMeta(time, NO_VEHICLE, nullptr);
 			}
 			break;
 		case 0xFF:
@@ -260,6 +285,7 @@ void TargetList::Refresh()
 			minRangeVehicle = &vehicles[i];
 		}
 	}
+	vfilter.Push(&time, minRangeVehicle->speed, minRangeVehicle->range);
 }
 
 iSys400x::iSys400x(UciRadar &uciradar)
@@ -389,6 +415,13 @@ void iSys400x::CmdReadTargetList()
 	SendSd2(read_target_list_16bit, countof(read_target_list_16bit));
 }
 
+void iSys400x::TaskRadarPollReset()
+{
+	CmdStopAcquisition();
+	taskRadar_ = 0;
+	ReloadTmrssTimeout();
+}
+
 bool iSys400x::TaskRadarPoll_(int *_ptLine)
 {
 	PT_BEGIN();
@@ -396,14 +429,23 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	{
 		do
 		{
-			CmdStopAcquisition();
-			tmrTaskRadar.Setms(100 - 1);
-			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+			radarStatus = RadarStatus::INITIALIZING;
 			ClearRxBuf();
 			CmdStartAcquisition();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-		} while (!VerifyCmdAck());
+			if(!VerifyCmdAck())
+			{
+				CmdStartAcquisition();
+				tmrTaskRadar.Setms(100 - 1);
+				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+				radarStatus = RadarStatus::INITIALIZING;
+			}
+			else
+			{
+				radarStatus = RadarStatus::READY;
+			}
+		} while (radarStatus == RadarStatus::INITIALIZING);
 		ReloadTmrssTimeout();
 		do
 		{
@@ -436,7 +478,7 @@ int iSys400x::SaveTarget(const char *comment)
 {
 	if (vdebug)
 	{
-		if (targetlist.minRangeVehicle != nullptr && (uciradar.radarMode & 1) == 0)
+		if (targetlist.minRangeVehicle != nullptr)
 		{
 			targetlist.minRangeVehicle->Print();
 			if (comment != nullptr && comment[0] != '\0')
@@ -447,6 +489,32 @@ int iSys400x::SaveTarget(const char *comment)
 	}
 	return targetlist.SaveTarget(comment);
 }
+
+RadarStatus iSys400x::GetStatus()
+{
+	if (ssTimeout.IsExpired())
+	{
+		radarStatus = RadarStatus::NO_CONNECTION;
+	}
+	if (radarStatus == RadarStatus::NO_CONNECTION)
+	{
+		// NO_CONNECTION
+		if (isConnected != Utils::STATE3::S3_0)
+		{
+			Connected(false);
+			PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
+		}
+	}
+	else if (radarStatus == RadarStatus::EVENT)
+	{
+		if (isConnected != Utils::STATE3::S3_1)
+		{
+			Connected(true);
+			PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
+		}
+	}
+	return radarStatus;
+};
 
 #if 0
 #include <3rdparty/catch2/EnableTest.h>
@@ -464,18 +532,18 @@ int iSys400x::SaveTarget(const char *comment)
 
 			TargetList list1{name, 4001};
 			list1.cnt = 1;
-			list1.vehicles[0] = {60, 80, 150, 12};
+			list1.vehicles[0] = {60, 80, 15000, 12};
 
 			TargetList list2{name, 4001};
 			list2.cnt = 2;
-			list2.vehicles[0] = {60, 80, 140, 12};
-			list2.vehicles[1] = {61, 70, 150, 12};
+			list2.vehicles[0] = {60, 80, 14000, 12};
+			list2.vehicles[1] = {61, 70, 15000, 12};
 
 			TargetList list3{name, 4001};
 			list3.cnt = 3;
-			list3.vehicles[0] = {60, 80, 130, 12};
-			list3.vehicles[1] = {61, 70, 140, 12};
-			list3.vehicles[2] = {62, 60, 150, 12};
+			list3.vehicles[0] = {60, 80, 13000, 12};
+			list3.vehicles[1] = {61, 70, 14000, 12};
+			list3.vehicles[2] = {62, 60, 15000, 12};
 
 			TargetList target{name, 4001};
 

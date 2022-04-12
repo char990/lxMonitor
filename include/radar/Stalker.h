@@ -11,7 +11,6 @@
 #include <uci/UciSettings.h>
 #include <module/BootTimer.h>
 
-
 namespace Radar
 {
     namespace Stalker
@@ -72,12 +71,14 @@ namespace Radar
         public:
             VehicleList(std::string &name) : name(name), csv(name + "DBG1"){};
             std::list<std::shared_ptr<Vehicle>> vlist;
-            void PushDgb1(const char *dbg1);
+            int PushDgb1(const char *dbg1);
             bool newVehicle{false};
             bool hasVehicle{false};
+            bool vdebug{false};
+
         private:
             SaveCSV csv;
-            int SaveDBG1(const char *dbg1, const char *comment=nullptr);
+            int SaveDBG1(const char *dbg1, const char *comment = nullptr);
             void VehicleFlush(struct timeval &t);
             struct timeval time
             {
@@ -96,15 +97,21 @@ namespace Radar
 
             virtual int RxCallback(uint8_t *buf, int len) override;
 
-            virtual bool TaskRadarPoll() override { return true; };
+            virtual bool TaskRadarPoll() override;
 
             bool NewVehicle() { return vehicleList.newVehicle; };
             void NewVehicle(bool v) { vehicleList.newVehicle = v; };
 
             VehicleList vehicleList;
+            virtual RadarStatus GetStatus() override;
+
+            virtual void Vdebug(bool v) override
+            {
+                vdebug = v;
+                vehicleList.vdebug = v;
+            };
 
         protected:
-
 #define DBG1_SIZE 33
             uint8_t dbg1buf[DBG1_SIZE];
             int dbg1len;

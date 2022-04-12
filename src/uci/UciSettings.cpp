@@ -74,6 +74,7 @@ void UciSettings::LoadConfig()
 		c.iSys.minRange = GetInt(uciSec, _MinRange, 1, 99, true);
 		c.iSys.minSignal = GetInt(uciSec, _MinSignal, 1, 99, true);
 		c.iSys.minSpeed = GetInt(uciSec, _MinSpeed, 1, 99, true);
+		c.iSys.cmErr = GetInt(uciSec, _CmErr, 1, 9999, true);
 
 		// stalker
 		uciSec = GetSection(stalker);
@@ -172,5 +173,9 @@ void UciSettings::PrintRadar(UciRadar &radar)
 	if (radar.minSignal >= 0)
 	{
 		PrintOption_d(_MinSignal, radar.minSignal);
+	}
+	if (radar.cmErr >= 0)
+	{
+		PrintOption_d(_CmErr, radar.cmErr);
 	}
 }

@@ -35,16 +35,37 @@ namespace Radar
         public:             // only use 16-bit resolution
             uint8_t signal; // db
             int16_t speed;  // km/h
-            int16_t range;  // m
+            int16_t range;  // cm
             int16_t angle;  // deg
-            int Print() { return printf("S=%3d V=%3d R=%3d A=%3d\n", signal, speed, range, angle); }
-            int Print(char *buf) { return sprintf(buf, "S=%3d V=%3d R=%3d A=%3d", signal, speed, range, angle); }
+            int Print() { return printf("S=%3d V=%3d R=%5d A=%3d\n", signal, speed, range, angle); }
+            int Print(char *buf) { return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle); }
+        };
+
+        struct VFItem
+        {
+            uint64_t usec;
+            int speed;
+            int range;
+        };
+
+        class VehicleFilter
+        {
+        public:
+#define VF_SIZE 2
+            VehicleFilter(int cmErr) : cmErr(cmErr)
+            {
+                bzero(&items[0], sizeof(items));
+            };
+            void Push(struct timeval *time, int s, int r);
+            VFItem items[VF_SIZE + 1];
+            bool isColsing{false};
+            int cmErr;
         };
 
         class TargetList
         {
         public:
-            TargetList(UciRadar &uciradar) : uciradar(uciradar), csv(uciradar.name + "Target"){};
+            TargetList(UciRadar &uciradar) : uciradar(uciradar), csv(uciradar.name + "Target"), vfilter(uciradar.cmErr){};
             int flag{0}; // return of DecodeTargetFrame
             int cnt{0};
             std::vector<Vehicle> vehicles{MAX_TARGETS};
@@ -61,10 +82,13 @@ namespace Radar
             int Print(char *buf);
             int Print();
 
+            /// \brief refresh minRangeVehicle and run vehicle filter to see if this is closing vehicle
             void Refresh();
             Vehicle *minRangeVehicle;
+            bool IsClosing() { return vfilter.isColsing; };
 
         private:
+            VehicleFilter vfilter;
             int code;
             bool hasVehicle{false};
             UciRadar &uciradar;
@@ -84,14 +108,16 @@ namespace Radar
             virtual int RxCallback(uint8_t *buf, int len) override { return 0; }; // No RxCallback for iSYS
 
             bool TaskRadarPoll() override { return TaskRadarPoll_(&taskRadar_); };
-
+            void TaskRadarPollReset();
             int SaveTarget(const char *comment);
 
             TargetList targetlist;
 
+            virtual RadarStatus GetStatus() override;
+
         protected:
             BootTimer tmrTaskRadar;
-            int taskRadar_;
+            int taskRadar_{0};
             bool TaskRadarPoll_(int *_ptLine);
 
 #define MAX_PACKET_SIZE (9 + MAX_TARGETS * 7 + 1)
@@ -110,5 +136,7 @@ namespace Radar
 
             void ClearRxBuf() { oprSp->ClearRx(); };
         };
+
+        
     }
 }

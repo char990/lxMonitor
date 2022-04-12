@@ -77,17 +77,20 @@ void LOG::ToString(char *buf)
 }
 
 /**************************VIHICLE*************************/
-void VehicleList::PushDgb1(const char *dbg1)
+int VehicleList::PushDgb1(const char *dbg1)
 {
-    if (*dbg1 != '\0')
+    if (*dbg1 == '\0')
     { // no vehicle
         if (hasVehicle)
         {
             hasVehicle = false;
             gettimeofday(&time, nullptr);
-            //SaveDBG1(dbg1, NO_VEHICLE);
-            vlist.clear(); // as there is no vhicle, clear all vehicles in list
-            Print();
+            newVehicle = false;
+            if (vdebug)
+            {
+                vlist.clear(); // as there is no vhicle, clear all vehicles in list
+                Print();
+            }
         }
     }
     else
@@ -122,15 +125,20 @@ void VehicleList::PushDgb1(const char *dbg1)
                 newv->dbg1list.push_back(d);
                 vlist.push_back(newv);
                 newVehicle = true;
-                PrintDbg(DBG_PRT, "New Vehicle:ID=%04d", d->id);
-                Print();
+                if (vdebug)
+                {
+                    PrintDbg(DBG_PRT, "New Vehicle:ID=%04d", d->id);
+                    Print();
+                }
             }
+            return d->id;
         }
         else
         {
             // SaveDBG1(dbg1, "Invalid DBG1");
         }
     }
+    return -1;
 }
 
 void VehicleList::Print()
@@ -152,8 +160,11 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
         { // vehicle disappeared
             auto id = (*v)->dbg1list.back()->id;
             v = vlist.erase(v); // erase current and iterate next
-            PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
-            Print();
+            if (vdebug)
+            {
+                PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
+                Print();
+            }
         }
         else
         {
@@ -200,12 +211,14 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
             if (dbg1len == DBG1_SIZE - 1 || dbg1len == 0)
             {
                 dbg1buf[dbg1len] = '\0';
-                vehicleList.PushDgb1((const char *)dbg1buf);
-                radarStatus = RadarStatus::EVENT;
-                if(dbg1len != 0 && vdebug)
+                if(vehicleList.PushDgb1((const char *)dbg1buf)>=0)
                 {
-                    printf("%s\n", dbg1buf);
+                    if (dbg1len != 0 && vdebug)
+                    {
+                        printf("%s\n", dbg1buf);
+                    }
                 }
+                radarStatus = RadarStatus::EVENT;
             }
             dbg1len = 0;
         }
@@ -222,6 +235,23 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
         }
     }
     return 0;
+}
+
+bool StalkerStat::TaskRadarPoll()
+{
+    return true;
+}
+
+RadarStatus StalkerStat::GetStatus()
+{
+    if (ssTimeout.IsExpired())
+    {
+        dbg1len = 0;
+        dbg1buf[0] = 0;
+        vehicleList.PushDgb1((const char *)dbg1buf);
+        radarStatus = RadarStatus::EVENT;
+    }
+    return radarStatus;
 }
 
 #if 0

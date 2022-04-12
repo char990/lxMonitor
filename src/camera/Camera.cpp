@@ -2,10 +2,9 @@
 #include <module/ptcpp.h>
 #include <module/MyDbg.h>
 
+Camera *cameras[3];
 
-Camera * cameras[3];
-
-const char XCAM[]={'F', 'B', 'M'};
+const char XCAM[] = {'F', 'B', 'M'};
 
 Camera::Camera(int id)
     : id(id)
@@ -30,13 +29,17 @@ bool Camera::TaskTakePhoto(int *_ptLine)
     while (true)
     {
         PT_WAIT_UNTIL(toTakePhoto == true);
-        toTakePhoto = false;
         takephoto->SetPinHigh();
-        tmrTakePhoto.Setms(500-1);
+        tmrTakePhoto.Setms(500 - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
-        PrintDbg(DBG_PRT, "%cCAM-shot", XCAM[id-1]);
+        if (conTakePhoto)
+        {
+            PrintDbg(DBG_PRT, "%cCAM-shot", XCAM[id - 1]);
+        }
+        toTakePhoto = false;
+        conTakePhoto = false;
         takephoto->SetPinLow();
-        tmrTakePhoto.Setms(500-1);
+        tmrTakePhoto.Setms(500 - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
     };
     PT_END();

@@ -29,6 +29,7 @@ public:
     int minRange{-1};
     int minSpeed{-1};
     int minSignal{-1};
+    int cmErr{-1};
 };
 
 class UciMonitor
@@ -84,6 +85,7 @@ private:
     const char *_MinRange = "MinRange";
     const char *_MinSpeed = "MinSpeed";
     const char *_MinSignal = "MinSignal";
+    const char *_CmErr = "CmErr";
 
 
     void PrintRadar(UciRadar & radar);
