@@ -23,6 +23,7 @@
                     "ignoreFailures": true
                 }
             ],
+            "targetArchitecture": "arm",
             "miDebuggerPath": "/home/build/project_6ull/build_myir/build_imx6ull_warrior/tmp/work/cortexa7t2hf-neon-fslc-linux-gnueabi/goblin/git-r0/recipe-sysroot-native/usr/bin/arm-fslc-linux-gnueabi/arm-linux-gnueabihf-gdb",
             // "/opt/myir-imx-fb/core/4.1.15-2.0.1/sysroots/x86_64-pokysdk-linux/usr/bin/arm-poky-linux-gnueabi/arm-poky-linux-gnueabi-gdb",
             "miDebuggerServerAddress": "192.168.1.216:2000"

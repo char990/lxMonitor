@@ -194,8 +194,8 @@ int main(int argc, char *argv[])
         tmrEvt100ms->Add(cameras[2]);
         
         // monitor
-        //monitors[0] = new Monitor(1, cameras[0], cameras[2]);
-        //tmrEvt10ms->Add(monitors[0]);
+        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
+        tmrEvt10ms->Add(monitors[0]);
         monitors[1] = new Monitor(2, cameras[1], nullptr);
         tmrEvt10ms->Add(monitors[1]);
 

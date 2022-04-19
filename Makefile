@@ -45,8 +45,8 @@ build:
 
 debug: 
 	@echo "debug : $(BUILDTIME)" > buildtime
-debug: CXXFLAGS += -DDEBUG -g -O0
-debug: CFLAGS += -DDEBUG -g -O0
+debug: CXXFLAGS += -DDEBUG -g3 -O0
+debug: CFLAGS += -DDEBUG -g3 -O0
 debug: all
 
 
