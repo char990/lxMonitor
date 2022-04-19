@@ -56,7 +56,7 @@ namespace Radar
             {
                 bzero(&items[0], sizeof(items));
             };
-            void Push(struct timeval *time, int s, int r);
+            void PushVehicle(struct timeval *time, int s, int r);
             VFItem items[VF_SIZE + 1];
             bool isColsing{false};
             int cmErr;

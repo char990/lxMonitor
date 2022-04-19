@@ -86,7 +86,7 @@ int VehicleList::PushDgb1(const char *dbg1)
             hasVehicle = false;
             gettimeofday(&time, nullptr);
             newVehicle = false;
-            if (vdebug)
+            if (vdebug>=3)
             {
                 vlist.clear(); // as there is no vhicle, clear all vehicles in list
                 Print();
@@ -125,9 +125,12 @@ int VehicleList::PushDgb1(const char *dbg1)
                 newv->dbg1list.push_back(d);
                 vlist.push_back(newv);
                 newVehicle = true;
-                if (vdebug)
+                if (vdebug>=2)
                 {
                     PrintDbg(DBG_PRT, "New Vehicle:ID=%04d", d->id);
+                }
+                if (vdebug>=3)
+                {
                     Print();
                 }
             }
@@ -160,9 +163,12 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
         { // vehicle disappeared
             auto id = (*v)->dbg1list.back()->id;
             v = vlist.erase(v); // erase current and iterate next
-            if (vdebug)
+            if (vdebug>=2)
             {
                 PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
+            }
+            if (vdebug>=3)
+            {
                 Print();
             }
         }
@@ -213,7 +219,7 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
                 dbg1buf[dbg1len] = '\0';
                 if(vehicleList.PushDgb1((const char *)dbg1buf)>=0)
                 {
-                    if (dbg1len != 0 && vdebug)
+                    if (dbg1len != 0 && vdebug>=3)
                     {
                         printf("%s\n", dbg1buf);
                     }

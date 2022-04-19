@@ -111,7 +111,7 @@ const uint8_t read_target_list_16bit[] = {
 	// 16	Output of sint16_t variable types (16-Bit output)
 };
 
-void VehicleFilter::Push(struct timeval *time, int s, int r)
+void VehicleFilter::PushVehicle(struct timeval *time, int s, int r)
 {
 	memcpy(&items[0], &items[1], VF_SIZE * sizeof(VFItem));
 	items[VF_SIZE].usec = time->tv_sec * 1000000 + time->tv_usec;
@@ -122,7 +122,7 @@ void VehicleFilter::Push(struct timeval *time, int s, int r)
 	{
 		int usec = items[i + 1].usec - items[i].usec;
 		int cm = items[i + 1].range - items[i].range;
-		if (items[i].usec == 0 || usec > 500000 || cm > 0)
+		if (items[i].usec == 0 || usec <= 0 || usec > 500000 || cm > 0)
 		{
 			return;
 		}
@@ -285,7 +285,7 @@ void TargetList::Refresh()
 			minRangeVehicle = &vehicles[i];
 		}
 	}
-	vfilter.Push(&time, minRangeVehicle->speed, minRangeVehicle->range);
+	vfilter.PushVehicle(&time, minRangeVehicle->speed, minRangeVehicle->range);
 }
 
 iSys400x::iSys400x(UciRadar &uciradar)
@@ -436,7 +436,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if(!VerifyCmdAck())
 			{
-				CmdStartAcquisition();
+				CmdStopAcquisition();
 				tmrTaskRadar.Setms(100 - 1);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 				radarStatus = RadarStatus::INITIALIZING;
@@ -476,15 +476,11 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 
 int iSys400x::SaveTarget(const char *comment)
 {
-	if (vdebug)
+	if (vdebug>=3)
 	{
 		if (targetlist.minRangeVehicle != nullptr)
 		{
 			targetlist.minRangeVehicle->Print();
-			if (comment != nullptr && comment[0] != '\0')
-			{
-				printf("\t\t\t%s\n", comment);
-			}
 		}
 	}
 	return targetlist.SaveTarget(comment);

@@ -35,10 +35,14 @@ void Monitor::PeriodicRun()
         {
             stalker->NewVehicle(false);
             camera->TakePhoto();
+            if(stalker->Vdebug()>=1)
+            {
+                PrintDbg(DBG_PRT, "STKR[%d] takes photo", id);
+            }
         }
     }
     // ----------------- iSYS400x -----------------
-    if (1) // stalker->vehicleList.vlist.size() > 0)
+    if (1)//stalker->vehicleList.vlist.size() > 0)
     // only there is vehicle in stalker, in order to filter the noise for iSys400x
     {
         isys400x->TaskRadarPoll();
@@ -51,6 +55,10 @@ void Monitor::PeriodicRun()
             {
                 camera->TakePhoto();
                 isys400x->SaveTarget(PHOTO_TAKEN);
+                if(isys400x->Vdebug()>=1)
+                {
+                    PrintDbg(DBG_PRT, "ISYS[%d] takes photo", id);
+                }
             }
             else
             {
@@ -97,7 +105,7 @@ bool Monitor::CheckRange()
     lastRange = v->range;
     if (uciRangeIndex >= uciMonitor.distance.size() || lastRange > uciMonitor.distance[uciRangeIndex] * 100)
     {
-        if (isys400x->Vdebug())
+        if (isys400x->Vdebug()>=2)
         {
             printf("\t\t\t\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastRange);
         }

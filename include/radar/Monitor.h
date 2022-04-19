@@ -13,8 +13,8 @@ public:
     Monitor(int id, Camera *camera, Camera *cameraM); // id is 1/2
     ~Monitor();
 
-    void StalkerDebug(bool v) { stalker->Vdebug(v); };
-    void iSysDebug(bool v) { isys400x->Vdebug(v); };
+    void StalkerDebug(int v) { stalker->Vdebug(v); };
+    void iSysDebug(int v) { isys400x->Vdebug(v); };
 
     // Add this to 100ms timer event, so PeriodicRun() will be called every 100ms
     virtual void PeriodicRun() override;

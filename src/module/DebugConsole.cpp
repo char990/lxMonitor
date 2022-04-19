@@ -25,10 +25,10 @@ const Command DebugConsole::CMD_LIST[] = {
      "Take photo by camera f|m|b. Usage: shoot f|m|b",
      DebugConsole::Cmd_shoot},
     {"stkr",
-     "Stalker 1|2 debug info 0(OFF)|1(ON). Usage: stkr 1|2 0|1",
+     "Stalker 1|2 debug info 0-3. Usage: stkr 1|2 0-3",
      DebugConsole::Cmd_stkr},
     {"isys",
-     "iSys400x 1|2 debug info 0(OFF)|1(ON). Usage: isys 1|2 0|1",
+     "iSys400x 1|2 debug info 0-3. Usage: isys 1|2 0-3",
      DebugConsole::Cmd_isys},
 };
 
@@ -193,7 +193,7 @@ void DebugConsole::Cmd_stkr(int argc, char *argv[])
     {
         int r = argv[1][0] - '1';
         int s = argv[2][0] - '0';
-        if ((r == 0 || r == 1) && (s == 0 || s == 1))
+        if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
             monitors[r]->StalkerDebug(s);
             return;
@@ -208,7 +208,7 @@ void DebugConsole::Cmd_isys(int argc, char *argv[])
     {
         int r = argv[1][0] - '1';
         int s = argv[2][0] - '0';
-        if ((r == 0 || r == 1) && (s == 0 || s == 1))
+        if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
             monitors[r]->iSysDebug(s);
             return;

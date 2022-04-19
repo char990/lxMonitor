@@ -74,7 +74,7 @@ namespace Radar
             int PushDgb1(const char *dbg1);
             bool newVehicle{false};
             bool hasVehicle{false};
-            bool vdebug{false};
+            int vdebug{0};
 
         private:
             SaveCSV csv;
@@ -105,10 +105,14 @@ namespace Radar
             VehicleList vehicleList;
             virtual RadarStatus GetStatus() override;
 
-            virtual void Vdebug(bool v) override
+            virtual void Vdebug(int v) override
             {
-                vdebug = v;
-                vehicleList.vdebug = v;
+                vdebug = vehicleList.vdebug = v;
+            };
+
+            virtual int Vdebug() override
+            {
+                return vdebug;
             };
 
         protected:
