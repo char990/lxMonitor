@@ -29,9 +29,13 @@ extern GpioOut * pPinHeartbeatLed;
 extern GpioOut * pPinStatusLed;
 
 extern GpioOut * pPinWdt;
+
 extern GpioOut * pPinRelay;
-extern GpioOut * pPinMosfet1;
-extern GpioOut * pPinMosfet2;
+inline void RelayNoOn() {pPinRelay->SetPinHigh();};
+inline void RelayNcOn() {pPinRelay->SetPinLow();};
+
+//extern GpioOut * pPinMosfet1;
+//extern GpioOut * pPinMosfet2;
 
 extern GpioOut * pOutput[3];
 

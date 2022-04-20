@@ -30,10 +30,10 @@ bool Camera::TaskTakePhoto(int *_ptLine)
     while (true)
     {
         PT_WAIT_UNTIL(toTakePhoto == true);
-        takephoto->SetPinHigh();
+        takephoto->SetPinLow();
         tmrTakePhoto.Setms(TAKINGPHOTO_TIME - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
-        takephoto->SetPinLow();
+        takephoto->SetPinHigh();
         tmrTakePhoto.Setms(1000 - TAKINGPHOTO_TIME - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
         if (conTakePhoto)

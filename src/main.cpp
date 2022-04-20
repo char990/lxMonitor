@@ -103,13 +103,15 @@ void GpioInit()
     pPinStatusLed = new GpioOut(PIN_ST_LED, 1);    // status led, green
     pPinWdt = new GpioOut(PIN_WDT, 1);             // watchdog
 
-    pOutput[0] /*VO2*/ = pPinMosfet2 = new GpioOut(PIN_MOSFET2_CTRL, 0); // mosfet off
-    pOutput[1] /*VO1*/= pPinMosfet1 = new GpioOut(PIN_MOSFET1_CTRL, 0); // mosfet off
-    pOutput[2] = pPinRelay = new GpioOut(PIN_RELAY_CTRL, 0);     // relay off
-
-    pInput[0] = pPinIn1 = new GpioIn(5, 5, PIN_G1_MSG1); // read in tmrEvt10ms
-    pInput[1] = pPinIn2 = new GpioIn(5, 5, PIN_G1_MSG2); // read in tmrEvt10ms
+    pOutput[0] = new GpioOut(PIN_MAIN_FAILURE, 0);
+    pOutput[1] = new GpioOut(PIN_BATTERY_LOW, 0);
+    pOutput[2] = new GpioOut(PIN_BATTERY_OPEN, 0);
+    
+    pInput[0] = pPinIn1 = new GpioIn(5, 5, PIN_G1_MSG2); // read in tmrEvt10ms
+    pInput[1] = pPinIn2 = new GpioIn(5, 5, PIN_G1_MSG1); // read in tmrEvt10ms
     pInput[2] = pPinIn3 = new GpioIn(5, 5, PIN_G1_AUTO); // read in tmrEvt10ms
+
+    pPinRelay = new GpioOut(PIN_RELAY_CTRL, 0);     // relay off
 }
 
 #if 0
@@ -194,10 +196,10 @@ int main(int argc, char *argv[])
         tmrEvt100ms->Add(cameras[2]);
         
         // monitor
-        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
-        tmrEvt10ms->Add(monitors[0]);
-        monitors[1] = new Monitor(2, cameras[1], nullptr);
-        tmrEvt10ms->Add(monitors[1]);
+//        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
+//        tmrEvt10ms->Add(monitors[0]);
+//        monitors[1] = new Monitor(2, cameras[1], nullptr);
+//        tmrEvt10ms->Add(monitors[1]);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");
         printf("\n=>Input '?<Enter>' to get console help.\n\n");
