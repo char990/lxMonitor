@@ -292,7 +292,7 @@ iSys400x::iSys400x(UciRadar &uciradar)
 	: IRadar(uciradar), targetlist(uciradar)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
-	radarStatus = RadarStatus::READY;
+	radarStatus = RadarStatus::POWER_UP;
 }
 
 iSys400x::~iSys400x()
@@ -400,6 +400,21 @@ iSYS_Status iSys400x::ChkRxFrame(uint8_t *rxBuffer, int len)
 	return c == rxBuffer[chk] ? iSYS_Status::ISYS_RX_SUCCESS : iSYS_Status::ISYS_RX_SUM_ERROR;
 }
 
+int iSys400x::DecodeDeviceName()
+{
+	if(packet[ISYS_FRM_FC] != RADAR_CMD_RD_DEV_NAME)
+	{
+		return -1;
+	}
+	PrintDbg(DBG_LOG, "%s:%s", uciradar.name.c_str(), (char *)packet+ISYS_FRM_PDU);
+	return 0;
+}
+
+void iSys400x::CmdReadDeviceName()
+{
+	SendSd2(read_device_name, countof(read_device_name));
+}
+
 void iSys400x::CmdStartAcquisition()
 {
 	SendSd2(start_acquisition, countof(start_acquisition));
@@ -427,14 +442,28 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	PT_BEGIN();
 	while (true)
 	{
+		// get device name
 		do
 		{
-			radarStatus = RadarStatus::INITIALIZING;
 			ClearRxBuf();
+			CmdReadDeviceName();
+			tmrTaskRadar.Setms(100 - 1);
+			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+			if (ReadPacket() > 0)
+			{
+				if(DecodeDeviceName()==0)
+				{
+					radarStatus = RadarStatus::READY;
+				}
+			}
+		}while(radarStatus != RadarStatus::READY);
+		ReloadTmrssTimeout();
+		// stop then start 
+		do{
 			CmdStartAcquisition();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			if(!VerifyCmdAck())
+			if (!VerifyCmdAck())
 			{
 				CmdStopAcquisition();
 				tmrTaskRadar.Setms(100 - 1);
@@ -447,6 +476,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			}
 		} while (radarStatus == RadarStatus::INITIALIZING);
 		ReloadTmrssTimeout();
+		// read target list
 		do
 		{
 			ClearRxBuf();
@@ -476,7 +506,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 
 int iSys400x::SaveTarget(const char *comment)
 {
-	if (vdebug>=3)
+	if (Vdebug() >= 3)
 	{
 		if (targetlist.minRangeVehicle != nullptr)
 		{
@@ -484,6 +514,11 @@ int iSys400x::SaveTarget(const char *comment)
 		}
 	}
 	return targetlist.SaveTarget(comment);
+}
+
+void iSys400x::ReloadTmrssTimeout()
+{
+	ssTimeout.Setms(5000);
 }
 
 RadarStatus iSys400x::GetStatus()
@@ -495,7 +530,7 @@ RadarStatus iSys400x::GetStatus()
 	if (radarStatus == RadarStatus::NO_CONNECTION)
 	{
 		// NO_CONNECTION
-		if (isConnected != Utils::STATE3::S3_0)
+		if (!IsNotConnected())
 		{
 			Connected(false);
 			PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
@@ -503,7 +538,7 @@ RadarStatus iSys400x::GetStatus()
 	}
 	else if (radarStatus == RadarStatus::EVENT)
 	{
-		if (isConnected != Utils::STATE3::S3_1)
+		if (!IsConnected())
 		{
 			Connected(true);
 			PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());

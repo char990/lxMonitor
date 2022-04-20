@@ -124,17 +124,22 @@ namespace Radar
             uint8_t packet[MAX_PACKET_SIZE];
             int packetLen;
             void SendSd2(const uint8_t *p, int len);
+            void CmdReadDeviceName();
             void CmdStartAcquisition();
             void CmdStopAcquisition();
             void CmdReadTargetList();
             bool VerifyCmdAck();
             iSYS_Status ChkRxFrame(uint8_t *packet, int packetLen);
+            int DecodeDeviceName();
 
             /// \brief Read packet. If there are more than one packet in buf, only keep the last packet
             /// \return packet length
             int ReadPacket();
 
             void ClearRxBuf() { oprSp->ClearRx(); };
+
+            virtual void ReloadTmrssTimeout() override;
+
         };
 
         

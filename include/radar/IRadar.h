@@ -30,6 +30,7 @@ namespace Radar
         UciRadar &uciradar;
 
         bool IsConnected() { return isConnected == Utils::STATE3::S3_1; };
+        bool IsNotConnected() { return isConnected == Utils::STATE3::S3_0; };
         void Connected(bool c) { isConnected = c ? Utils::STATE3::S3_1 : Utils::STATE3::S3_0; };
         virtual void Vdebug(int v) { vdebug = v; };
         virtual int Vdebug() { return vdebug; };
@@ -45,6 +46,6 @@ namespace Radar
         OprSp *oprSp{nullptr};
         RadarStatus radarStatus{RadarStatus::POWER_UP};
         BootTimer ssTimeout;
-        void ReloadTmrssTimeout() { ssTimeout.Setms(500); };
+        virtual void ReloadTmrssTimeout() { ssTimeout.Setms(500); };
     };
 }

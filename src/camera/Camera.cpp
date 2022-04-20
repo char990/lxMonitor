@@ -23,6 +23,7 @@ void Camera::PeriodicRun()
     TaskTakePhoto(&taskTakePhotoLine);
 }
 
+#define TAKINGPHOTO_TIME 500
 bool Camera::TaskTakePhoto(int *_ptLine)
 {
     PT_BEGIN();
@@ -30,17 +31,17 @@ bool Camera::TaskTakePhoto(int *_ptLine)
     {
         PT_WAIT_UNTIL(toTakePhoto == true);
         takephoto->SetPinHigh();
-        tmrTakePhoto.Setms(500 - 1);
+        tmrTakePhoto.Setms(TAKINGPHOTO_TIME - 1);
+        PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
+        takephoto->SetPinLow();
+        tmrTakePhoto.Setms(1000 - TAKINGPHOTO_TIME - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
         if (conTakePhoto)
         {
             PrintDbg(DBG_PRT, "%cCAM-shot", XCAM[id - 1]);
+            conTakePhoto = false;
         }
         toTakePhoto = false;
-        conTakePhoto = false;
-        takephoto->SetPinLow();
-        tmrTakePhoto.Setms(500 - 1);
-        PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
     };
     PT_END();
 }

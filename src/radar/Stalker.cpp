@@ -219,7 +219,7 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
                 dbg1buf[dbg1len] = '\0';
                 if(vehicleList.PushDgb1((const char *)dbg1buf)>=0)
                 {
-                    if (dbg1len != 0 && vdebug>=3)
+                    if (dbg1len != 0 && Vdebug()>=3)
                     {
                         printf("%s\n", dbg1buf);
                     }

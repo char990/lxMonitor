@@ -84,6 +84,10 @@ void Monitor::PeriodicRun()
 bool Monitor::CheckRange()
 {
     iSys::Vehicle *v = isys400x->targetlist.minRangeVehicle;
+    if(isys400x->targetlist.IsClosing() && v == nullptr)
+    {
+        
+    }
     if (v == nullptr || !isys400x->targetlist.IsClosing())
     {
         return false;
@@ -98,7 +102,7 @@ bool Monitor::CheckRange()
         // this is noise
         if (isys400x->Vdebug())
         {
-            printf("\t\t\t\t\tFALSE 1: v->range=%d, lastRange=%d\n", v->range, lastRange);
+            printf("\t\tFALSE 1: v->range=%d, lastRange=%d\n", v->range, lastRange);
         }
         return false;
     }*/
@@ -107,7 +111,7 @@ bool Monitor::CheckRange()
     {
         if (isys400x->Vdebug()>=2)
         {
-            printf("\t\t\t\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastRange);
+            printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastRange);
         }
         return false;
     }
