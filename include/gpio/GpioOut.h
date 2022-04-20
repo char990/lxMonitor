@@ -31,8 +31,14 @@ extern GpioOut * pPinStatusLed;
 extern GpioOut * pPinWdt;
 
 extern GpioOut * pPinRelay;
+#define RELAY_NC_ON 0
+#define RELAY_NC_OFF 1
+#define RELAY_NO_ON 1
+#define RELAY_NO_OFF 0
 inline void RelayNoOn() {pPinRelay->SetPinHigh();};
+inline void RelayNoOff() {pPinRelay->SetPinLow();};
 inline void RelayNcOn() {pPinRelay->SetPinLow();};
+inline void RelayNcOff() {pPinRelay->SetPinHigh();};
 
 //extern GpioOut * pPinMosfet1;
 //extern GpioOut * pPinMosfet2;

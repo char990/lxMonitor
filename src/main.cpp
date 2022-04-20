@@ -103,15 +103,15 @@ void GpioInit()
     pPinStatusLed = new GpioOut(PIN_ST_LED, 1);    // status led, green
     pPinWdt = new GpioOut(PIN_WDT, 1);             // watchdog
 
-    pOutput[0] = new GpioOut(PIN_MAIN_FAILURE, 0);
-    pOutput[1] = new GpioOut(PIN_BATTERY_LOW, 0);
-    pOutput[2] = new GpioOut(PIN_BATTERY_OPEN, 0);
+    pOutput[0] = new GpioOut(PIN_MAIN_FAILURE, 1);
+    pOutput[1] = new GpioOut(PIN_BATTERY_LOW, 1);
+    pOutput[2] = new GpioOut(PIN_BATTERY_OPEN, 1);
     
     pInput[0] = pPinIn1 = new GpioIn(5, 5, PIN_G1_MSG2); // read in tmrEvt10ms
     pInput[1] = pPinIn2 = new GpioIn(5, 5, PIN_G1_MSG1); // read in tmrEvt10ms
     pInput[2] = pPinIn3 = new GpioIn(5, 5, PIN_G1_AUTO); // read in tmrEvt10ms
 
-    pPinRelay = new GpioOut(PIN_RELAY_CTRL, 0);     // relay off
+    pPinRelay = new GpioOut(PIN_RELAY_CTRL, RELAY_NC_ON);     // relay off
 }
 
 #if 0

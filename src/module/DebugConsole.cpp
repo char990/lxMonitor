@@ -28,7 +28,8 @@ const Command DebugConsole::CMD_LIST[] = {
      "Stalker 1|2 debug info 0-3. Usage: stkr 1|2 0-3",
      DebugConsole::Cmd_stkr},
     {"isys",
-     "iSys400x 1|2 debug info 0-3. Usage: isys 1|2 0-3",
+     "iSys400x 1|2 debug info 0-3. Usage: isys 1|2 0-3\n"
+     "\t| iSys400x power on|off. Usage: isys on|off",
      DebugConsole::Cmd_isys},
 };
 
@@ -204,7 +205,22 @@ void DebugConsole::Cmd_stkr(int argc, char *argv[])
 
 void DebugConsole::Cmd_isys(int argc, char *argv[])
 {
-    if (argc == 3)
+    if (argc == 2)
+    {
+        if(strcmp(argv[1],"on")==0)
+        {
+            RelayNcOn();
+            printf("isys1&2 ON\n");
+            return;
+        }
+        else if(strcmp(argv[1],"off")==0)
+        {
+            RelayNcOff();
+            printf("isys1&2 OFF\n");
+            return;
+        }
+    }
+    else if (argc == 3)
     {
         int r = argv[1][0] - '1';
         int s = argv[2][0] - '0';
