@@ -26,6 +26,7 @@
 
 #include <controller/Controller.h>
 #include <radar/Monitor.h>
+#include <radar/iSys.h>
 #include <fsworker/SpaceGC.h>
 
 #include <websocket/WsServer.h>
@@ -194,12 +195,15 @@ int main(int argc, char *argv[])
         tmrEvt100ms->Add(cameras[1]);
         cameras[2] = new Camera(3);     // MCAM
         tmrEvt100ms->Add(cameras[2]);
-        
+
+        iSys400xPwr = new Radar::iSys::iSys400xPower();
+        tmrEvt100ms->Add(iSys400xPwr);
+
         // monitor
-//        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
-//        tmrEvt10ms->Add(monitors[0]);
-//        monitors[1] = new Monitor(2, cameras[1], nullptr);
-//        tmrEvt10ms->Add(monitors[1]);
+        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
+        tmrEvt10ms->Add(monitors[0]);
+        monitors[1] = new Monitor(2, cameras[1], nullptr);
+        tmrEvt10ms->Add(monitors[1]);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");
         printf("\n=>Input '?<Enter>' to get console help.\n\n");

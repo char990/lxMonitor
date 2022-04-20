@@ -8,6 +8,7 @@
 #include <module/IOperator.h>
 #include <module/BootTimer.h>
 #include <fsworker/SaveCSV.h>
+#include <module/IPeriodicRun.h>
 
 namespace Radar
 {
@@ -99,6 +100,19 @@ namespace Radar
             };
         };
 
+        class iSys400xPower : public IPeriodicRun
+        {
+        public:
+            void RePowerSet() { rePwr = true; };
+            bool IsPowering() { return rePwr; };
+            virtual void PeriodicRun() override { TaskRePower_(&_ptLine); };
+        private:
+            bool TaskRePower_(int *_ptLine);
+            int _ptLine;
+            bool rePwr{false};
+            BootTimer tmrRePwr;
+        };
+
         class iSys400x : public IRadar
         {
         public:
@@ -139,9 +153,9 @@ namespace Radar
             void ClearRxBuf() { oprSp->ClearRx(); };
 
             virtual void ReloadTmrssTimeout() override;
-
         };
 
-        
     }
 }
+
+extern Radar::iSys::iSys400xPower * iSys400xPwr;

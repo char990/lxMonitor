@@ -8,11 +8,14 @@
 #include <module/Epoll.h>
 #include <module/Utils.h>
 #include <module/ptcpp.h>
+#include <gpio/GpioOut.h>
 
 using namespace Utils;
 
 using namespace Radar;
 using namespace Radar::iSys;
+
+iSys400xPower * iSys400xPwr;
 
 /*****************************
 Radar is iSYS 4001
@@ -288,6 +291,23 @@ void TargetList::Refresh()
 	vfilter.PushVehicle(&time, minRangeVehicle->speed, minRangeVehicle->range);
 }
 
+bool iSys400xPower::TaskRePower_(int *_ptLine)
+{
+	PT_BEGIN();
+	while (true)
+	{
+		PT_WAIT_UNTIL(rePwr);
+		RelayNcOff();
+		tmrRePwr.Setms(4000);
+		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
+		RelayNcOn();
+		tmrRePwr.Setms(1000);
+		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
+		rePwr = false;
+	};
+	PT_END();
+}
+
 iSys400x::iSys400x(UciRadar &uciradar)
 	: IRadar(uciradar), targetlist(uciradar)
 {
@@ -402,11 +422,11 @@ iSYS_Status iSys400x::ChkRxFrame(uint8_t *rxBuffer, int len)
 
 int iSys400x::DecodeDeviceName()
 {
-	if(packet[ISYS_FRM_FC] != RADAR_CMD_RD_DEV_NAME)
+	if (packet[ISYS_FRM_FC] != RADAR_CMD_RD_DEV_NAME)
 	{
 		return -1;
 	}
-	PrintDbg(DBG_LOG, "%s:%s", uciradar.name.c_str(), (char *)packet+ISYS_FRM_PDU);
+	PrintDbg(DBG_LOG, "%s:%s", uciradar.name.c_str(), (char *)packet + ISYS_FRM_PDU);
 	return 0;
 }
 
@@ -442,6 +462,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	PT_BEGIN();
 	while (true)
 	{
+		PT_WAIT_UNTIL(iSys400xPwr->IsPowering()==false);
 		// get device name
 		do
 		{
@@ -451,15 +472,16 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if (ReadPacket() > 0)
 			{
-				if(DecodeDeviceName()==0)
+				if (DecodeDeviceName() == 0)
 				{
 					radarStatus = RadarStatus::READY;
 				}
 			}
-		}while(radarStatus != RadarStatus::READY);
+		} while (radarStatus != RadarStatus::READY);
 		ReloadTmrssTimeout();
-		// stop then start 
-		do{
+		// stop then start
+		do
+		{
 			CmdStartAcquisition();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
@@ -479,6 +501,11 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 		// read target list
 		do
 		{
+			if(iSys400xPwr->IsPowering())
+			{
+				TaskRadarPollReset();
+				return true;
+			}
 			ClearRxBuf();
 			CmdReadTargetList();
 			tmrTaskRadar.Setms(100 - 1);
@@ -500,6 +527,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				}
 			}
 		} while (GetStatus() != RadarStatus::NO_CONNECTION);
+		iSys400xPwr->RePowerSet();
 	};
 	PT_END();
 }
