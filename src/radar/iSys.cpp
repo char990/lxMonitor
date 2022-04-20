@@ -15,7 +15,7 @@ using namespace Utils;
 using namespace Radar;
 using namespace Radar::iSys;
 
-iSys400xPower * iSys400xPwr;
+iSys400xPower *iSys400xPwr;
 
 /*****************************
 Radar is iSYS 4001
@@ -297,6 +297,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	while (true)
 	{
 		PT_WAIT_UNTIL(rePwr);
+		PrintDbg(DBG_LOG, "iSys power-cycle: START");
 		RelayNcOff();
 		tmrRePwr.Setms(4000);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
@@ -304,6 +305,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 		tmrRePwr.Setms(1000);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
 		rePwr = false;
+		PrintDbg(DBG_LOG, "iSys power-cycle: DONE");
 	};
 	PT_END();
 }
@@ -462,7 +464,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	PT_BEGIN();
 	while (true)
 	{
-		PT_WAIT_UNTIL(iSys400xPwr->IsPowering()==false);
+		PT_WAIT_UNTIL(iSys400xPwr->IsPowering() == false);
 		// get device name
 		do
 		{
@@ -501,7 +503,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 		// read target list
 		do
 		{
-			if(iSys400xPwr->IsPowering())
+			if (iSys400xPwr->IsPowering())
 			{
 				TaskRadarPollReset();
 				return true;
@@ -551,25 +553,33 @@ void iSys400x::ReloadTmrssTimeout()
 
 RadarStatus iSys400x::GetStatus()
 {
-	if (ssTimeout.IsExpired())
+	if (iSys400xPwr->IsPowering())
 	{
-		radarStatus = RadarStatus::NO_CONNECTION;
+		Connected(false);
+		radarStatus = RadarStatus::POWER_UP;
 	}
-	if (radarStatus == RadarStatus::NO_CONNECTION)
+	else
 	{
-		// NO_CONNECTION
-		if (!IsNotConnected())
+		if (ssTimeout.IsExpired())
 		{
-			Connected(false);
-			PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
+			radarStatus = RadarStatus::NO_CONNECTION;
 		}
-	}
-	else if (radarStatus == RadarStatus::EVENT)
-	{
-		if (!IsConnected())
+		if (radarStatus == RadarStatus::NO_CONNECTION)
 		{
-			Connected(true);
-			PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
+			// NO_CONNECTION
+			if (!IsNotConnected())
+			{
+				Connected(false);
+				PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
+			}
+		}
+		else if (radarStatus == RadarStatus::EVENT)
+		{
+			if (!IsConnected())
+			{
+				Connected(true);
+				PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
+			}
 		}
 	}
 	return radarStatus;
