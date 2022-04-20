@@ -13,8 +13,8 @@ GpioOut *pPinHeartbeatLed=nullptr;
 GpioOut *pPinStatusLed=nullptr;
 GpioOut *pPinWdt=nullptr;
 GpioOut *pPinRelay=nullptr;
-GpioOut *pPinMosfet1=nullptr;
-GpioOut *pPinMosfet2=nullptr;
+//GpioOut *pPinMosfet1=nullptr;
+//GpioOut *pPinMosfet2=nullptr;
 
 GpioOut * pOutput[3];
 
