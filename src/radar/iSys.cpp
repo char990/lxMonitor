@@ -296,7 +296,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	PT_BEGIN();
 	while (true)
 	{
-		PT_WAIT_UNTIL(rePwr);
+		PT_WAIT_UNTIL(iSysPwr == PwrSt::AUTOPWR_OFF);
 		PrintDbg(DBG_LOG, "iSys power-cycle: START");
 		RelayNcOff();
 		tmrRePwr.Setms(4000);
@@ -304,7 +304,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 		RelayNcOn();
 		tmrRePwr.Setms(1000);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
-		rePwr = false;
+		iSysPwr = PwrSt::PWR_ON;
 		PrintDbg(DBG_LOG, "iSys power-cycle: DONE");
 	};
 	PT_END();
@@ -464,7 +464,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	PT_BEGIN();
 	while (true)
 	{
-		PT_WAIT_UNTIL(iSys400xPwr->IsPowering() == false);
+		PT_WAIT_UNTIL(iSys400xPwr->iSysPwr == iSys400xPower::PwrSt::PWR_ON);
 		// get device name
 		do
 		{
@@ -503,7 +503,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 		// read target list
 		do
 		{
-			if (iSys400xPwr->IsPowering())
+			if (iSys400xPwr->iSysPwr != iSys400xPower::PwrSt::PWR_ON)
 			{
 				TaskRadarPollReset();
 				return true;
@@ -529,7 +529,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				}
 			}
 		} while (GetStatus() != RadarStatus::NO_CONNECTION);
-		iSys400xPwr->RePowerSet();
+		iSys400xPwr->AutoPwrOff();
 	};
 	PT_END();
 }
@@ -553,7 +553,7 @@ void iSys400x::ReloadTmrssTimeout()
 
 RadarStatus iSys400x::GetStatus()
 {
-	if (iSys400xPwr->IsPowering())
+	if (iSys400xPwr->iSysPwr != iSys400xPower::PwrSt::PWR_ON)
 	{
 		Connected(false);
 		radarStatus = RadarStatus::POWER_UP;

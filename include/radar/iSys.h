@@ -103,13 +103,21 @@ namespace Radar
         class iSys400xPower : public IPeriodicRun
         {
         public:
-            void RePowerSet() { rePwr = true; };
-            bool IsPowering() { return rePwr; };
+            enum class PwrSt
+            {
+                MANUAL_OFF,
+                AUTOPWR_OFF,
+                PWR_ON
+            };
+            PwrSt iSysPwr{PwrSt::PWR_ON};
+            void ManualOff() { iSysPwr = PwrSt::MANUAL_OFF; };
+            void AutoPwrOff() { iSysPwr = PwrSt::AUTOPWR_OFF; };
+            void PwrOn() { iSysPwr = PwrSt::PWR_ON; };
             virtual void PeriodicRun() override { TaskRePower_(&_ptLine); };
+
         private:
             bool TaskRePower_(int *_ptLine);
             int _ptLine;
-            bool rePwr{false};
             BootTimer tmrRePwr;
         };
 
@@ -158,4 +166,4 @@ namespace Radar
     }
 }
 
-extern Radar::iSys::iSys400xPower * iSys400xPwr;
+extern Radar::iSys::iSys400xPower *iSys400xPwr;

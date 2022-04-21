@@ -6,6 +6,7 @@
 #include <module/DebugConsole.h>
 #include <module/Epoll.h>
 #include <camera/Camera.h>
+#include <radar/iSys.h>
 #include <radar/Monitor.h>
 
 const Command DebugConsole::CMD_LIST[] = {
@@ -210,12 +211,14 @@ void DebugConsole::Cmd_isys(int argc, char *argv[])
         if(strcmp(argv[1],"on")==0)
         {
             RelayNcOn();
+            iSys400xPwr->PwrOn();
             printf("isys1&2 ON\n");
             return;
         }
         else if(strcmp(argv[1],"off")==0)
         {
             RelayNcOff();
+            iSys400xPwr->ManualOff();
             printf("isys1&2 OFF\n");
             return;
         }
