@@ -12,7 +12,7 @@ Monitor::Monitor(int id, Camera *camera, Camera *cameraM)
     : id(id), camera(camera), cameraM(cameraM), uciMonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1])
 {
     stalker = new Stalker::StalkerStat(uciMonitor.stalker);
-    isys400x = new iSys::iSys400x(uciMonitor.iSys);
+    isys400x = new iSys::iSys400x(uciMonitor.iSys, uciMonitor.distance);
 }
 
 Monitor::~Monitor()
@@ -48,7 +48,7 @@ void Monitor::PeriodicRun()
     {
         isys400x->SetStatus(RadarStatus::READY);
         // check distance
-        int r = CheckRange();
+        int r = isys400x->CheckRange();
         if (r == 0)
         {
             isys400x->SaveTarget(nullptr);
@@ -83,48 +83,3 @@ void Monitor::PeriodicRun()
     }
 }
 
-int Monitor::CheckRange()
-{
-    int r = 0;
-    iSys::Vehicle *v = isys400x->targetlist.minRangeVehicle;
-    if (v == nullptr)
-    {
-        if (isys400x->targetlist.IsClosing() && lastVehicle.speed != 0)
-        {
-            
-        
-            r = 1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    else
-    {
-        if (tmrRange.IsExpired())
-        {
-            TaskRangeReSet();
-            bzero(&lastVehicle, sizeof(lastVehicle));
-        }
-        else if((v->range > (lastVehicle.range + uciMonitor.iSys.rangeRise * 100) && lastVehicle.range < uciMonitor.iSys.rangeLast * 100))
-        {
-            memcpy(&lastVehicle, v, sizeof(lastVehicle));
-
-        }
-    }
-    if (uciRangeIndex >= uciMonitor.distance.size() || lastVehicle.range > uciMonitor.distance[uciRangeIndex] * 100)
-    {
-        if (isys400x->Vdebug() >= 2)
-        {
-            printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastVehicle.range);
-        }
-        return 0;
-    }
-    // should take a photo
-    while (uciRangeIndex < uciMonitor.distance.size() && lastVehicle.range <= uciMonitor.distance[uciRangeIndex] * 100)
-    {
-        uciRangeIndex++;
-    };
-    return r + 1;
-}

@@ -26,18 +26,6 @@ private:
     Radar::Stalker::StalkerStat *stalker;
     Camera *camera;
     Camera *cameraM;
-
-    /*********************CheckRange********************/
-    /// \return 0:Normal; 1:Take photo by setting; 2:Take photo by speculation
-    int CheckRange();
-    void TaskRangeReSet()
-    {
-        uciRangeIndex = 0;
-        tmrRange.Setms(60000);
-    };
-    BootTimer tmrRange;
-    int uciRangeIndex{0};
-    iSys::Vehicle lastVehicle;
 };
 
 extern Monitor * monitors[2];

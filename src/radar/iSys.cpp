@@ -334,8 +334,8 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	PT_END();
 }
 
-iSys400x::iSys400x(UciRadar &uciradar)
-	: IRadar(uciradar), targetlist(uciradar)
+iSys400x::iSys400x(UciRadar &uciradar, std::vector<int> & distance)
+	: IRadar(uciradar), targetlist(uciradar), distance(distance)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::POWER_UP;
@@ -620,6 +620,52 @@ RadarStatus iSys400x::GetStatus()
 	}
 	return radarStatus;
 };
+
+int iSys400x::CheckRange()
+{
+    int r = 0;
+    iSys::Vehicle *v = targetlist.minRangeVehicle;
+    if (v == nullptr)
+    {
+        if (targetlist.IsClosing() && lastVehicle.speed != 0)
+        {
+            
+        
+            r = 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+    else
+    {
+        if (tmrRange.IsExpired())
+        {
+            TaskRangeReSet();
+            bzero(&lastVehicle, sizeof(lastVehicle));
+        }
+        else if((v->range > (lastVehicle.range + uciradar.rangeRise * 100) && lastVehicle.range < uciradar.rangeLast * 100))
+        {
+            memcpy(&lastVehicle, v, sizeof(lastVehicle));
+
+        }
+    }
+    if (uciRangeIndex >= distance.size() || lastVehicle.range > distance[uciRangeIndex] * 100)
+    {
+        if (Vdebug() >= 2)
+        {
+            printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastVehicle.range);
+        }
+        return 0;
+    }
+    // should take a photo
+    while (uciRangeIndex < distance.size() && lastVehicle.range <= distance[uciRangeIndex] * 100)
+    {
+        uciRangeIndex++;
+    };
+    return r + 1;
+}
 
 #if 0
 #include <3rdparty/catch2/EnableTest.h>

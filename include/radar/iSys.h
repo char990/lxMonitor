@@ -92,7 +92,7 @@ namespace Radar
             void Refresh();
             Vehicle *minRangeVehicle;
             bool IsClosing() { return vfilter.isColsing; };
-            uint64_t GetPktTime(){return pktTime.tv_sec * 1000000 + pktTime.tv_usec;};
+            uint64_t GetPktTime() { return pktTime.tv_sec * 1000000 + pktTime.tv_usec; };
 
         private:
             VehicleFilter vfilter;
@@ -130,7 +130,7 @@ namespace Radar
         class iSys400x : public IRadar
         {
         public:
-            iSys400x(UciRadar &uciradar);
+            iSys400x(UciRadar &uciradar, std::vector<int> &distance);
             virtual ~iSys400x();
 
             virtual int RxCallback(uint8_t *buf, int len) override { return 0; }; // No RxCallback for iSYS
@@ -144,7 +144,11 @@ namespace Radar
 
             virtual RadarStatus GetStatus() override;
 
+            /// \return 0:Normal; 1:Take photo by setting; 2:Take photo by speculation
+            int CheckRange();
+
         protected:
+            std::vector<int> &distance;
             BootTimer tmrTaskRadar;
             int taskRadar_{0};
             bool TaskRadarPoll_(int *_ptLine);
@@ -168,6 +172,16 @@ namespace Radar
             void ClearRxBuf() { oprSp->ClearRx(); };
 
             virtual void ReloadTmrssTimeout() override;
+
+            /*********************CheckRange********************/
+            void TaskRangeReSet()
+            {
+                uciRangeIndex = 0;
+                tmrRange.Setms(60000);
+            };
+            BootTimer tmrRange;
+            int uciRangeIndex{0};
+            iSys::Vehicle lastVehicle;
         };
 
     }
