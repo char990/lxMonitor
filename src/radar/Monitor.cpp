@@ -35,41 +35,43 @@ void Monitor::PeriodicRun()
         {
             stalker->NewVehicle(false);
             camera->TakePhoto();
-            if(stalker->Vdebug()>=1)
+            if (stalker->Vdebug() >= 1)
             {
                 PrintDbg(DBG_PRT, "STKR[%d] takes photo", id);
             }
         }
     }
     // ----------------- iSYS400x -----------------
-    if (1)//stalker->vehicleList.vlist.size() > 0)
-    // only there is vehicle in stalker, in order to filter the noise for iSys400x
+    isys400x->TaskRadarPoll();
+    st = isys400x->GetStatus();
+    if (st == RadarStatus::EVENT)
     {
-        isys400x->TaskRadarPoll();
-        st = isys400x->GetStatus();
-        if (st == RadarStatus::EVENT)
+        isys400x->SetStatus(RadarStatus::READY);
+        // check distance
+        int r = CheckRange();
+        if (r == 0)
         {
-            isys400x->SetStatus(RadarStatus::READY);
-            // check distance
-            if (CheckRange())
+            isys400x->SaveTarget(nullptr);
+        }
+        else
+        {
+            camera->TakePhoto();
+            if (isys400x->Vdebug() >= 1)
             {
-                camera->TakePhoto();
-                isys400x->SaveTarget(PHOTO_TAKEN);
-                if(isys400x->Vdebug()>=1)
-                {
-                    PrintDbg(DBG_PRT, "ISYS[%d] takes photo", id);
-                }
+                PrintDbg(DBG_PRT, "ISYS[%d] takes photo", id);
             }
-            else
+            if (r == 1)
             {
+                isys400x->SaveTarget(PHOTO_TAKEN);
+            }
+            else if (r == 2)
+            {
+                isys400x->SaveMeta(PHOTO_TAKEN, "Based on speculation");
                 isys400x->SaveTarget(nullptr);
             }
         }
     }
-    else
-    {
-        isys400x->TaskRadarPollReset();
-    }
+
     // ----------------- own camera -----------------
     // cameraM
     if (cameraM != nullptr)
@@ -81,44 +83,48 @@ void Monitor::PeriodicRun()
     }
 }
 
-bool Monitor::CheckRange()
+int Monitor::CheckRange()
 {
+    int r = 0;
     iSys::Vehicle *v = isys400x->targetlist.minRangeVehicle;
-    if(isys400x->targetlist.IsClosing() && v == nullptr)
+    if (v == nullptr)
     {
+        if (isys400x->targetlist.IsClosing() && lastVehicle.speed != 0)
+        {
+            
         
-    }
-    if (v == nullptr || !isys400x->targetlist.IsClosing())
-    {
-        return false;
-    }
-    if (tmrRange.IsExpired() || (v->range > (lastRange + uciMonitor.iSys.rangeRise * 100) && lastRange < uciMonitor.iSys.rangeLast * 100))
-    {
-        TaskRangeReSet();
-    }
-    /*
-    else if (v->range >= lastRange)
-    {
-        // this is noise
-        if (isys400x->Vdebug())
-        {
-            printf("\t\tFALSE 1: v->range=%d, lastRange=%d\n", v->range, lastRange);
+            r = 1;
         }
-        return false;
-    }*/
-    lastRange = v->range;
-    if (uciRangeIndex >= uciMonitor.distance.size() || lastRange > uciMonitor.distance[uciRangeIndex] * 100)
-    {
-        if (isys400x->Vdebug()>=2)
+        else
         {
-            printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastRange);
+            return 0;
         }
-        return false;
+    }
+    else
+    {
+        if (tmrRange.IsExpired())
+        {
+            TaskRangeReSet();
+            bzero(&lastVehicle, sizeof(lastVehicle));
+        }
+        else if((v->range > (lastVehicle.range + uciMonitor.iSys.rangeRise * 100) && lastVehicle.range < uciMonitor.iSys.rangeLast * 100))
+        {
+            memcpy(&lastVehicle, v, sizeof(lastVehicle));
+
+        }
+    }
+    if (uciRangeIndex >= uciMonitor.distance.size() || lastVehicle.range > uciMonitor.distance[uciRangeIndex] * 100)
+    {
+        if (isys400x->Vdebug() >= 2)
+        {
+            printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastVehicle.range);
+        }
+        return 0;
     }
     // should take a photo
-    while (uciRangeIndex < uciMonitor.distance.size() && lastRange <= uciMonitor.distance[uciRangeIndex] * 100)
+    while (uciRangeIndex < uciMonitor.distance.size() && lastVehicle.range <= uciMonitor.distance[uciRangeIndex] * 100)
     {
         uciRangeIndex++;
     };
-    return true;
+    return r + 1;
 }

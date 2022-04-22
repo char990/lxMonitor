@@ -33,13 +33,14 @@ namespace Radar
 
         class Vehicle
         {
-        public:             // only use 16-bit resolution
-            uint8_t signal; // db
-            int16_t speed;  // km/h
-            int16_t range;  // cm
-            int16_t angle;  // deg
+        public:                // only use 16-bit resolution
+            uint8_t signal{0}; // db
+            int16_t speed{0};  // km/h
+            int16_t range{0};  // cm
+            int16_t angle{0};  // deg
             int Print() { return printf("S=%3d V=%3d R=%5d A=%3d\n", signal, speed, range, angle); }
             int Print(char *buf) { return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle); }
+            void Reset() { bzero(this, sizeof(Vehicle)); };
         };
 
         struct VFItem
@@ -55,18 +56,21 @@ namespace Radar
 #define VF_SIZE 2
             VehicleFilter(int cmErr) : cmErr(cmErr)
             {
-                bzero(&items[0], sizeof(items));
+                Reset();
             };
             void PushVehicle(struct timeval *time, int s, int r);
             VFItem items[VF_SIZE + 1];
             bool isColsing{false};
             int cmErr;
+            void Reset();
         };
 
         class TargetList
         {
         public:
             TargetList(UciRadar &uciradar) : uciradar(uciradar), csv(uciradar.name + "Target"), vfilter(uciradar.cmErr){};
+            void Reset();
+
             int flag{0}; // return of DecodeTargetFrame
             int cnt{0};
             std::vector<Vehicle> vehicles{MAX_TARGETS};
@@ -79,6 +83,7 @@ namespace Radar
             void MakeTargetMsg(uint8_t *buf, int *len);
 
             int SaveTarget(const char *comment);
+            int SaveMeta(const char *comment, const char *details);
 
             int Print(char *buf);
             int Print();
@@ -87,6 +92,7 @@ namespace Radar
             void Refresh();
             Vehicle *minRangeVehicle;
             bool IsClosing() { return vfilter.isColsing; };
+            uint64_t GetPktTime(){return pktTime.tv_sec * 1000000 + pktTime.tv_usec;};
 
         private:
             VehicleFilter vfilter;
@@ -94,7 +100,7 @@ namespace Radar
             bool hasVehicle{false};
             UciRadar &uciradar;
             SaveCSV csv;
-            struct timeval time
+            struct timeval pktTime
             {
                 0, 0
             };
@@ -129,9 +135,10 @@ namespace Radar
 
             virtual int RxCallback(uint8_t *buf, int len) override { return 0; }; // No RxCallback for iSYS
 
-            bool TaskRadarPoll() override { return TaskRadarPoll_(&taskRadar_); };
-            void TaskRadarPollReset();
+            bool TaskRadarPoll() override;
+
             int SaveTarget(const char *comment);
+            int SaveMeta(const char *comment, const char *details);
 
             TargetList targetlist;
 

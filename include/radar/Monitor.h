@@ -28,16 +28,16 @@ private:
     Camera *cameraM;
 
     /*********************CheckRange********************/
-    bool CheckRange();
+    /// \return 0:Normal; 1:Take photo by setting; 2:Take photo by speculation
+    int CheckRange();
     void TaskRangeReSet()
     {
-        lastRange = 0;
         uciRangeIndex = 0;
         tmrRange.Setms(60000);
     };
     BootTimer tmrRange;
-    int16_t lastRange{0};
     int uciRangeIndex{0};
+    iSys::Vehicle lastVehicle;
 };
 
 extern Monitor * monitors[2];

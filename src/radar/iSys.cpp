@@ -139,10 +139,28 @@ void VehicleFilter::PushVehicle(struct timeval *time, int s, int r)
 	isColsing = true;
 };
 
+void VehicleFilter::Reset()
+{
+	bzero(items, sizeof(items));
+	isColsing = false;
+}
+
+void TargetList::Reset()
+{
+	flag = 0;
+	cnt = 0;
+	for (auto &v : vehicles)
+	{
+		v.Reset();
+	}
+	minRangeVehicle = nullptr;
+	vfilter.Reset();
+}
+
 int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 {
 	cnt = 0;
-	gettimeofday(&time, nullptr);
+	gettimeofday(&pktTime, nullptr);
 	int fc = (packet[0] == ISYS_FRM_CTRL_SD2 /* check SD2 Frame */) ? 6 /* variable length frames */
 																	: 3 /* fixed length frames */;
 	int output_number = packet[fc + 1];
@@ -217,6 +235,12 @@ void TargetList::MakeTargetMsg(uint8_t *buf, int *len)
 	*len = pdulen + 6;
 }
 
+int TargetList::SaveMeta(const char *comment, const char *details)
+{
+	csv.SaveRadarMeta(pktTime, comment, details);
+	return 0;
+}
+
 int TargetList::SaveTarget(const char *comment)
 {
 	if (cnt == 0)
@@ -240,9 +264,9 @@ int TargetList::SaveTarget(const char *comment)
 	}
 	else
 	{
-		hasVehicle = true;
 		char xbuf[1024];
 		xbuf[0] = 0;
+		hasVehicle = true;
 		if (uciradar.radarMode == 0)
 		{
 			Print(xbuf);
@@ -251,7 +275,7 @@ int TargetList::SaveTarget(const char *comment)
 		{
 			minRangeVehicle->Print(xbuf);
 		}
-		csv.SaveRadarMeta(time, comment, xbuf);
+		csv.SaveRadarMeta(pktTime, comment, xbuf);
 	}
 	return 0;
 }
@@ -288,7 +312,7 @@ void TargetList::Refresh()
 			minRangeVehicle = &vehicles[i];
 		}
 	}
-	vfilter.PushVehicle(&time, minRangeVehicle->speed, minRangeVehicle->range);
+	vfilter.PushVehicle(&pktTime, minRangeVehicle->speed, minRangeVehicle->range);
 }
 
 bool iSys400xPower::TaskRePower_(int *_ptLine)
@@ -452,20 +476,35 @@ void iSys400x::CmdReadTargetList()
 	SendSd2(read_target_list_16bit, countof(read_target_list_16bit));
 }
 
-void iSys400x::TaskRadarPollReset()
+bool iSys400x::TaskRadarPoll()
 {
-	CmdStopAcquisition();
-	taskRadar_ = 0;
-	ReloadTmrssTimeout();
-}
+	if (iSys400xPwr->iSysPwr != iSys400xPower::PwrSt::PWR_ON)
+	{
+		if (taskRadar_ != 0)
+		{
+			taskRadar_ = 0;
+			targetlist.Reset();
+			packetLen = 0;
+		}
+		return false;
+	}
+	TaskRadarPoll_(&taskRadar_);
+	if (GetStatus() == RadarStatus::NO_CONNECTION)
+	{
+		// time manage to avoid relay action constantly
+		iSys400xPwr->AutoPwrOff();
+	}
+	return true;
+};
 
 bool iSys400x::TaskRadarPoll_(int *_ptLine)
 {
 	PT_BEGIN();
 	while (true)
 	{
-		PT_WAIT_UNTIL(iSys400xPwr->iSysPwr == iSys400xPower::PwrSt::PWR_ON);
 		// get device name
+		ReloadTmrssTimeout();
+		radarStatus = RadarStatus::POWER_UP;
 		do
 		{
 			ClearRxBuf();
@@ -476,12 +515,14 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			{
 				if (DecodeDeviceName() == 0)
 				{
-					radarStatus = RadarStatus::READY;
+					radarStatus = RadarStatus::EVENT;
 				}
 			}
-		} while (radarStatus != RadarStatus::READY);
-		ReloadTmrssTimeout();
+		} while (GetStatus() != RadarStatus::EVENT);
+
 		// stop then start
+		ReloadTmrssTimeout();
+		radarStatus = RadarStatus::INITIALIZING;
 		do
 		{
 			CmdStartAcquisition();
@@ -492,29 +533,24 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				CmdStopAcquisition();
 				tmrTaskRadar.Setms(100 - 1);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-				radarStatus = RadarStatus::INITIALIZING;
 			}
 			else
 			{
-				radarStatus = RadarStatus::READY;
+				radarStatus = RadarStatus::EVENT;
 			}
-		} while (radarStatus == RadarStatus::INITIALIZING);
-		ReloadTmrssTimeout();
+		} while (GetStatus() != RadarStatus::EVENT);
+
 		// read target list
+		ReloadTmrssTimeout();
+		radarStatus = RadarStatus::READY;
 		do
 		{
-			if (iSys400xPwr->iSysPwr != iSys400xPower::PwrSt::PWR_ON)
-			{
-				TaskRadarPollReset();
-				return true;
-			}
 			ClearRxBuf();
 			CmdReadTargetList();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if (ReadPacket() > 0)
 			{
-				ReloadTmrssTimeout();
 				int x = targetlist.DecodeTargetFrame(packet, packetLen);
 				targetlist.flag = x;
 				if (x == 0 || x == 0xFF)
@@ -527,9 +563,9 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 					targetlist.Refresh();
 					radarStatus = RadarStatus::EVENT;
 				}
+				ReloadTmrssTimeout();
 			}
 		} while (GetStatus() != RadarStatus::NO_CONNECTION);
-		iSys400xPwr->AutoPwrOff();
 	};
 	PT_END();
 }
