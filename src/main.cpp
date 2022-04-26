@@ -113,6 +113,7 @@ void GpioInit()
     pInput[2] = pPinIn3 = new GpioIn(5, 5, PIN_G1_AUTO); // read in tmrEvt10ms
 
     pPinRelay = new GpioOut(PIN_RELAY_CTRL, RELAY_NC_ON);     // relay off
+    Utils::Time::SleepMs(1000);                    // must sleep 1 second to GpioOut stable
 }
 
 #if 0

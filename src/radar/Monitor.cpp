@@ -66,8 +66,8 @@ void Monitor::PeriodicRun()
             }
             else if (r == 2)
             {
-                isys400x->SaveMeta(PHOTO_TAKEN, "Based on speculation");
                 isys400x->SaveTarget(nullptr);
+                isys400x->SaveMeta(PHOTO_TAKEN, "Based on speculation");
             }
         }
     }

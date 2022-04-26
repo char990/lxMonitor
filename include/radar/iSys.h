@@ -108,6 +108,8 @@ namespace Radar
 
         class iSys400xPower : public IPeriodicRun
         {
+            #define ISYS_PWR_0_T 4000
+            #define ISYS_PWR_1_T 1000
         public:
             enum class PwrSt
             {
@@ -120,7 +122,6 @@ namespace Radar
             void AutoPwrOff() { iSysPwr = PwrSt::AUTOPWR_OFF; };
             void PwrOn() { iSysPwr = PwrSt::PWR_ON; };
             virtual void PeriodicRun() override { TaskRePower_(&_ptLine); };
-
         private:
             bool TaskRePower_(int *_ptLine);
             int _ptLine;
@@ -137,21 +138,19 @@ namespace Radar
 
             bool TaskRadarPoll() override;
 
+            void Reset();
+
             int SaveTarget(const char *comment);
+
             int SaveMeta(const char *comment, const char *details);
 
             TargetList targetlist;
-
-            virtual RadarStatus GetStatus() override;
 
             /// \return 0:Normal; 1:Take photo by setting; 2:Take photo by speculation
             int CheckRange();
 
         protected:
             std::vector<int> &distance;
-            BootTimer tmrTaskRadar;
-            int taskRadar_{0};
-            bool TaskRadarPoll_(int *_ptLine);
 
 #define MAX_PACKET_SIZE (9 + MAX_TARGETS * 7 + 1)
             uint8_t packet[MAX_PACKET_SIZE];
@@ -173,15 +172,19 @@ namespace Radar
 
             virtual void ReloadTmrssTimeout() override;
 
-            /*********************CheckRange********************/
-            void TaskRangeReSet()
-            {
-                uciRangeIndex = 0;
-                tmrRange.Setms(60000);
-            };
+            /*********************TaskRadarPoll_********************/
+            BootTimer tmrPwrDelay;
+            int pwrDelay{0};
+            BootTimer tmrTaskRadar;
+            int taskRadarPoll_{0};
+            bool TaskRadarPoll_(int *_ptLine);
+            void TaskRadarPoll_Reset();
+
+            /*********************TaskRange********************/
             BootTimer tmrRange;
             int uciRangeIndex{0};
             iSys::Vehicle lastVehicle;
+            void TaskRangeReSet();
         };
 
     }

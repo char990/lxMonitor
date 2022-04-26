@@ -103,6 +103,7 @@ namespace Radar
             void NewVehicle(bool v) { vehicleList.newVehicle = v; };
 
             VehicleList vehicleList;
+            
             virtual RadarStatus GetStatus() override;
 
             virtual void Vdebug(int v) override

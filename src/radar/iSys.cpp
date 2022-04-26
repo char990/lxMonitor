@@ -323,10 +323,10 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 		PT_WAIT_UNTIL(iSysPwr == PwrSt::AUTOPWR_OFF);
 		PrintDbg(DBG_LOG, "iSys power-cycle: START");
 		RelayNcOff();
-		tmrRePwr.Setms(4000);
+		tmrRePwr.Setms(ISYS_PWR_0_T);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
 		RelayNcOn();
-		tmrRePwr.Setms(1000);
+		tmrRePwr.Setms(ISYS_PWR_1_T);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
 		iSysPwr = PwrSt::PWR_ON;
 		PrintDbg(DBG_LOG, "iSys power-cycle: DONE");
@@ -334,11 +334,12 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	PT_END();
 }
 
-iSys400x::iSys400x(UciRadar &uciradar, std::vector<int> & distance)
+iSys400x::iSys400x(UciRadar &uciradar, std::vector<int> &distance)
 	: IRadar(uciradar), targetlist(uciradar), distance(distance)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::POWER_UP;
+	tmrPwrDelay.Setms(0);
 }
 
 iSys400x::~iSys400x()
@@ -476,26 +477,79 @@ void iSys400x::CmdReadTargetList()
 	SendSd2(read_target_list_16bit, countof(read_target_list_16bit));
 }
 
+void iSys400x::Reset()
+{
+	TaskRangeReSet();
+	TaskRadarPoll_Reset();
+}
+
+void iSys400x::TaskRadarPoll_Reset()
+{
+	packetLen = 0;
+	ClearRxBuf();
+	taskRadarPoll_ = 0;
+	targetlist.Reset();
+	ReloadTmrssTimeout();
+	isConnected = Utils::STATE3::S3_NA;
+}
+
+void iSys400x::TaskRangeReSet()
+{
+	uciRangeIndex = 0;
+	tmrRange.Setms(60000);
+	bzero(&lastVehicle, sizeof(lastVehicle));
+}
+
 bool iSys400x::TaskRadarPoll()
 {
-	if (iSys400xPwr->iSysPwr != iSys400xPower::PwrSt::PWR_ON)
+	if (iSys400xPwr->iSysPwr == iSys400xPower::PwrSt::PWR_ON)
 	{
-		if (taskRadar_ != 0)
+		TaskRadarPoll_(&taskRadarPoll_);
+		if (ssTimeout.IsExpired())
 		{
-			taskRadar_ = 0;
-			targetlist.Reset();
-			packetLen = 0;
+			if (tmrPwrDelay.IsExpired())
+			{
+				iSys400xPwr->AutoPwrOff();
+				radarStatus = RadarStatus::NO_CONNECTION;
+				if (!IsNotConnected())
+				{
+					Connected(false);
+					PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
+				}
+				if (pwrDelay == 0)
+				{
+					pwrDelay = 60 * 1000; // one minute
+				}
+				else if (pwrDelay < 64 * 60 * 1000) // 64 minutes
+				{
+					pwrDelay *= 2;
+				}
+				tmrPwrDelay.Setms(pwrDelay);
+			}
 		}
-		return false;
+		else
+		{
+			if (radarStatus == RadarStatus::EVENT)
+			{
+				if (!IsConnected())
+				{
+					Connected(true);
+					PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
+				}
+				pwrDelay = 0;
+				tmrPwrDelay.Setms(pwrDelay);
+			}
+		}
 	}
-	TaskRadarPoll_(&taskRadar_);
-	if (GetStatus() == RadarStatus::NO_CONNECTION)
+	else
 	{
-		// time manage to avoid relay action constantly
-		iSys400xPwr->AutoPwrOff();
+		if (taskRadarPoll_ != 0)
+		{
+			Reset();
+		}
 	}
 	return true;
-};
+}
 
 bool iSys400x::TaskRadarPoll_(int *_ptLine)
 {
@@ -516,9 +570,10 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				if (DecodeDeviceName() == 0)
 				{
 					radarStatus = RadarStatus::EVENT;
+					PT_YIELD();
 				}
 			}
-		} while (GetStatus() != RadarStatus::EVENT);
+		} while (radarStatus != RadarStatus::EVENT);
 
 		// stop then start
 		ReloadTmrssTimeout();
@@ -537,8 +592,9 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			else
 			{
 				radarStatus = RadarStatus::EVENT;
+				PT_YIELD();
 			}
-		} while (GetStatus() != RadarStatus::EVENT);
+		} while (radarStatus != RadarStatus::EVENT);
 
 		// read target list
 		ReloadTmrssTimeout();
@@ -565,7 +621,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				}
 				ReloadTmrssTimeout();
 			}
-		} while (GetStatus() != RadarStatus::NO_CONNECTION);
+		} while (true);
 	};
 	PT_END();
 }
@@ -582,89 +638,61 @@ int iSys400x::SaveTarget(const char *comment)
 	return targetlist.SaveTarget(comment);
 }
 
-void iSys400x::ReloadTmrssTimeout()
+int iSys400x::SaveMeta(const char *comment, const char *details)
 {
-	ssTimeout.Setms(5000);
+	if (Vdebug() >= 3)
+	{
+		printf("\tMeta=%s,%s", comment, details);
+	}
+	return targetlist.SaveMeta(comment, details);
 }
 
-RadarStatus iSys400x::GetStatus()
+void iSys400x::ReloadTmrssTimeout()
 {
-	if (iSys400xPwr->iSysPwr != iSys400xPower::PwrSt::PWR_ON)
-	{
-		Connected(false);
-		radarStatus = RadarStatus::POWER_UP;
-	}
-	else
-	{
-		if (ssTimeout.IsExpired())
-		{
-			radarStatus = RadarStatus::NO_CONNECTION;
-		}
-		if (radarStatus == RadarStatus::NO_CONNECTION)
-		{
-			// NO_CONNECTION
-			if (!IsNotConnected())
-			{
-				Connected(false);
-				PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
-			}
-		}
-		else if (radarStatus == RadarStatus::EVENT)
-		{
-			if (!IsConnected())
-			{
-				Connected(true);
-				PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
-			}
-		}
-	}
-	return radarStatus;
-};
+	ssTimeout.Setms(ISYS_PWR_0_T + ISYS_PWR_1_T + 1000);
+}
 
 int iSys400x::CheckRange()
 {
-    int r = 0;
-    iSys::Vehicle *v = targetlist.minRangeVehicle;
-    if (v == nullptr)
-    {
-        if (targetlist.IsClosing() && lastVehicle.speed != 0)
-        {
-            
-        
-            r = 1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    else
-    {
-        if (tmrRange.IsExpired())
-        {
-            TaskRangeReSet();
-            bzero(&lastVehicle, sizeof(lastVehicle));
-        }
-        else if((v->range > (lastVehicle.range + uciradar.rangeRise * 100) && lastVehicle.range < uciradar.rangeLast * 100))
-        {
-            memcpy(&lastVehicle, v, sizeof(lastVehicle));
+	if (tmrRange.IsExpired())
+	{
+		TaskRangeReSet();
+	}
+	int r = 0;
+	iSys::Vehicle *v = targetlist.minRangeVehicle;
+	if (v == nullptr)
+	{
+		if (targetlist.IsClosing() && lastVehicle.speed != 0)
+		{
 
-        }
-    }
-    if (uciRangeIndex >= distance.size() || lastVehicle.range > distance[uciRangeIndex] * 100)
-    {
-        if (Vdebug() >= 2)
-        {
-            printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastVehicle.range);
-        }
-        return 0;
-    }
-    // should take a photo
-    while (uciRangeIndex < distance.size() && lastVehicle.range <= distance[uciRangeIndex] * 100)
-    {
-        uciRangeIndex++;
-    };
-    return r + 1;
+			r = 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+	else
+	{
+		else if ((v->range > (lastVehicle.range + uciradar.rangeRise * 100) && lastVehicle.range < uciradar.rangeLast * 100))
+		{
+			memcpy(&lastVehicle, v, sizeof(lastVehicle));
+		}
+	}
+	if (uciRangeIndex >= distance.size() || lastVehicle.range > distance[uciRangeIndex] * 100)
+	{
+		if (Vdebug() >= 2)
+		{
+			printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastVehicle.range);
+		}
+		return 0;
+	}
+	// should take a photo
+	while (uciRangeIndex < distance.size() && lastVehicle.range <= distance[uciRangeIndex] * 100)
+	{
+		uciRangeIndex++;
+	};
+	return r + 1;
 }
 
 #if 0

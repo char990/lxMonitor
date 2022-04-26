@@ -23,8 +23,7 @@ namespace Radar
     public:
         IRadar(UciRadar &uciradar) : uciradar(uciradar) { ReloadTmrssTimeout(); };
         virtual int RxCallback(uint8_t *buf, int len) = 0;
-        virtual RadarStatus GetStatus() = 0;
-
+        virtual RadarStatus GetStatus() { return radarStatus;};
         virtual void SetStatus(RadarStatus s) { radarStatus = s; };
         virtual bool TaskRadarPoll() = 0;
         UciRadar &uciradar;
