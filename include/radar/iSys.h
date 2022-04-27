@@ -33,21 +33,16 @@ namespace Radar
 
         class Vehicle
         {
-        public:                // only use 16-bit resolution
-            uint8_t signal{0}; // db
-            int16_t speed{0};  // km/h
-            int16_t range{0};  // cm
-            int16_t angle{0};  // deg
+        public: // only use 16-bit resolution
+            int64_t usec;
+            uint8_t signal{0}; // db, signal(0) means this container is empty
+            int16_t speed;     // km/h
+            int16_t range;     // cm
+            int16_t angle;     // deg
+            bool IsValid() { return signal > 0; };
             int Print() { return printf("S=%3d V=%3d R=%5d A=%3d\n", signal, speed, range, angle); }
             int Print(char *buf) { return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle); }
-            void Reset() { bzero(this, sizeof(Vehicle)); };
-        };
-
-        struct VFItem
-        {
-            uint64_t usec;
-            int speed;
-            int range;
+            void Reset() { signal = 0; };
         };
 
         class VehicleFilter
@@ -58,8 +53,8 @@ namespace Radar
             {
                 Reset();
             };
-            void PushVehicle(struct timeval *time, int s, int r);
-            VFItem items[VF_SIZE + 1];
+            void PushVehicle(Vehicle *v);
+            Vehicle items[VF_SIZE + 1];
             bool isColsing{false};
             int cmErr;
             void Reset();
@@ -108,8 +103,8 @@ namespace Radar
 
         class iSys400xPower : public IPeriodicRun
         {
-            #define ISYS_PWR_0_T 4000
-            #define ISYS_PWR_1_T 1000
+#define ISYS_PWR_0_T 4000
+#define ISYS_PWR_1_T 1000
         public:
             enum class PwrSt
             {
@@ -122,6 +117,7 @@ namespace Radar
             void AutoPwrOff() { iSysPwr = PwrSt::AUTOPWR_OFF; };
             void PwrOn() { iSysPwr = PwrSt::PWR_ON; };
             virtual void PeriodicRun() override { TaskRePower_(&_ptLine); };
+
         private:
             bool TaskRePower_(int *_ptLine);
             int _ptLine;
@@ -183,7 +179,7 @@ namespace Radar
             /*********************TaskRange********************/
             BootTimer tmrRange;
             int uciRangeIndex{0};
-            iSys::Vehicle lastVehicle;
+            iSys::Vehicle v1st, v2nd;
             void TaskRangeReSet();
         };
 

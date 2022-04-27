@@ -17,6 +17,9 @@ using namespace Radar::iSys;
 
 iSys400xPower *iSys400xPwr;
 
+#define RangeCM_sp_us(sp, us) (sp * us / 36000)
+#define Timeval2us(tv) ((int64_t)1000000 * tv.tv_sec + tv.tv_usec)
+
 /*****************************
 Radar is iSYS 4001
 ******************************
@@ -114,12 +117,14 @@ const uint8_t read_target_list_16bit[] = {
 	// 16	Output of sint16_t variable types (16-Bit output)
 };
 
-void VehicleFilter::PushVehicle(struct timeval *time, int s, int r)
+void VehicleFilter::PushVehicle(Vehicle *v)
 {
-	memcpy(&items[0], &items[1], VF_SIZE * sizeof(VFItem));
-	items[VF_SIZE].usec = time->tv_sec * 1000000 + time->tv_usec;
-	items[VF_SIZE].speed = s;
-	items[VF_SIZE].range = r;
+	if (!v->IsValid())
+	{
+		return;
+	}
+	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
+	memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
 	isColsing = false;
 	for (int i = 0; i < VF_SIZE; i++)
 	{
@@ -129,7 +134,7 @@ void VehicleFilter::PushVehicle(struct timeval *time, int s, int r)
 		{
 			return;
 		}
-		int r = items[i].speed * usec / 36000;
+		int r = RangeCM_sp_us(items[i].speed, usec);
 		cm = (cm > r) ? (cm - r) : (r - cm);
 		if (cm > cmErr)
 		{
@@ -178,10 +183,13 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 	{
 		return -1;
 	}
+	int64_t usec = Timeval2us(pktTime);
 	auto pData = &packet[fc + 3];
 	for (int i = 0; i < nrOfTargets; i++)
 	{
 		auto &v = vehicles[cnt];
+		// time
+		v.usec = usec;
 		// Signal
 		v.signal = *pData;
 		pData += 1;
@@ -312,7 +320,7 @@ void TargetList::Refresh()
 			minRangeVehicle = &vehicles[i];
 		}
 	}
-	vfilter.PushVehicle(&pktTime, minRangeVehicle->speed, minRangeVehicle->range);
+	vfilter.PushVehicle(minRangeVehicle);
 }
 
 bool iSys400xPower::TaskRePower_(int *_ptLine)
@@ -321,7 +329,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	while (true)
 	{
 		PT_WAIT_UNTIL(iSysPwr == PwrSt::AUTOPWR_OFF);
-		PrintDbg(DBG_LOG, "iSys power-cycle: START");
+		PrintDbg(DBG_LOG, "iSys power-reset: START");
 		RelayNcOff();
 		tmrRePwr.Setms(ISYS_PWR_0_T);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
@@ -329,7 +337,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 		tmrRePwr.Setms(ISYS_PWR_1_T);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
 		iSysPwr = PwrSt::PWR_ON;
-		PrintDbg(DBG_LOG, "iSys power-cycle: DONE");
+		PrintDbg(DBG_LOG, "iSys power-reset: DONE");
 	};
 	PT_END();
 }
@@ -497,7 +505,8 @@ void iSys400x::TaskRangeReSet()
 {
 	uciRangeIndex = 0;
 	tmrRange.Setms(60000);
-	bzero(&lastVehicle, sizeof(lastVehicle));
+	bzero(&v1st, sizeof(v1st));
+	bzero(&v2nd, sizeof(v2nd));
 }
 
 bool iSys400x::TaskRadarPoll()
@@ -518,7 +527,7 @@ bool iSys400x::TaskRadarPoll()
 				}
 				if (pwrDelay == 0)
 				{
-					pwrDelay = 60 * 1000; // one minute
+					pwrDelay = 1 * 60 * 1000; // one minute
 				}
 				else if (pwrDelay < 64 * 60 * 1000) // 64 minutes
 				{
@@ -557,7 +566,6 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	while (true)
 	{
 		// get device name
-		ReloadTmrssTimeout();
 		radarStatus = RadarStatus::POWER_UP;
 		do
 		{
@@ -570,13 +578,13 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				if (DecodeDeviceName() == 0)
 				{
 					radarStatus = RadarStatus::EVENT;
+					ReloadTmrssTimeout();
 					PT_YIELD();
 				}
 			}
 		} while (radarStatus != RadarStatus::EVENT);
 
 		// stop then start
-		ReloadTmrssTimeout();
 		radarStatus = RadarStatus::INITIALIZING;
 		do
 		{
@@ -592,12 +600,12 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			else
 			{
 				radarStatus = RadarStatus::EVENT;
+				ReloadTmrssTimeout();
 				PT_YIELD();
 			}
 		} while (radarStatus != RadarStatus::EVENT);
 
 		// read target list
-		ReloadTmrssTimeout();
 		radarStatus = RadarStatus::READY;
 		do
 		{
@@ -609,17 +617,19 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			{
 				int x = targetlist.DecodeTargetFrame(packet, packetLen);
 				targetlist.flag = x;
-				if (x == 0 || x == 0xFF)
+				if (x >= 0)
 				{
+					if (x == 0 || x == 0xFF)
+					{
+						targetlist.minRangeVehicle = nullptr;
+					}
+					else
+					{
+						targetlist.Refresh();
+					}
 					radarStatus = RadarStatus::EVENT;
-					targetlist.minRangeVehicle = nullptr;
+					ReloadTmrssTimeout();
 				}
-				else if (x > 0)
-				{
-					targetlist.Refresh();
-					radarStatus = RadarStatus::EVENT;
-				}
-				ReloadTmrssTimeout();
 			}
 		} while (true);
 	};
@@ -658,41 +668,124 @@ int iSys400x::CheckRange()
 	{
 		TaskRangeReSet();
 	}
-	int r = 0;
+	int speculation = 0;
+	int photo = 0;
+	auto Speculate_v1st = [&]
+	{
+		// refresh v1st based on speculation
+		struct timeval tv;
+		gettimeofday(&tv, nullptr);
+		int64_t usec = Timeval2us(tv);
+		int us = usec - v1st.usec;
+		if (us > 0)
+		{
+			v1st.usec = usec;
+			v1st.range -= RangeCM_sp_us(v1st.speed, us);
+			if (Vdebug() >= 2)
+			{
+				printf("\t\tv1st-Speculation:");
+				v1st.Print();
+			}
+			speculation = 1;
+			if (v1st.range <= distance.back() * 100)
+			{
+				photo = 1;
+			}
+		}
+	};
+
 	iSys::Vehicle *v = targetlist.minRangeVehicle;
 	if (v == nullptr)
 	{
-		if (targetlist.IsClosing() && lastVehicle.speed != 0)
-		{
-
-			r = 1;
+		if (!v1st.IsValid())
+		{ // there is nothing
+			return 0;
 		}
 		else
 		{
-			return 0;
+			Speculate_v1st();
 		}
 	}
 	else
 	{
-		else if ((v->range > (lastVehicle.range + uciradar.rangeRise * 100) && lastVehicle.range < uciradar.rangeLast * 100))
+		if (!v1st.IsValid())
+		{ // save v to v1st
+			memcpy(&v1st, v, sizeof(v1st));
+		}
+		else
 		{
-			memcpy(&lastVehicle, v, sizeof(lastVehicle));
+			if (!v2nd.IsValid())
+			{ // only v1st
+				if ((v->range > (v1st.range + uciradar.rangeRise * 100) && v1st.range < uciradar.rangeLast * 100))
+				{ // range suddenly changed, means new vehicle, save v to v2nd and speculate v1st
+					Speculate_v1st();
+					memcpy(&v2nd, v, sizeof(v2nd));
+					uciRangeIndex = 0;
+				}
+				else
+				{
+					memcpy(&v1st, v, sizeof(v1st));
+				}
+			}
+			else
+			{ // with v2nd exists, isys lost v1st
+				Speculate_v1st();
+				memcpy(&v2nd, v, sizeof(v2nd));
+			}
 		}
 	}
-	if (uciRangeIndex >= distance.size() || lastVehicle.range > distance[uciRangeIndex] * 100)
-	{
-		if (Vdebug() >= 2)
+	if (!speculation)
+	{ // only check v1st
+		if (targetlist.IsClosing())
 		{
-			printf("\t\tFALSE 2: uciRangeIndex=%d, lastRange=%d\n", uciRangeIndex, lastVehicle.range);
+			if (uciRangeIndex >= distance.size() || v1st.range > distance[uciRangeIndex] * 100)
+			{
+				if (Vdebug() >= 2)
+				{
+					printf("\t\tFALSE 1: uciRangeIndex=%d, v1st.range=%d\n", uciRangeIndex, v1st.range);
+				}
+			}
+			else
+			{
+				photo = 1;
+				while (uciRangeIndex < distance.size() && v1st.range <= distance[uciRangeIndex] * 100)
+				{
+					uciRangeIndex++;
+				};
+			}
 		}
-		return 0;
 	}
-	// should take a photo
-	while (uciRangeIndex < distance.size() && lastVehicle.range <= distance[uciRangeIndex] * 100)
+	else
+	{ // speculation checked & check v2nd as well
+		if (v2nd.IsValid() && targetlist.IsClosing())
+		{
+			if (uciRangeIndex >= distance.size() || v2nd.range > distance[uciRangeIndex] * 100)
+			{
+				if (Vdebug() >= 2)
+				{
+					printf("\t\tFALSE 2: uciRangeIndex=%d, v2nd.range=%d\n", uciRangeIndex, v2nd.range);
+				}
+			}
+			else
+			{
+				photo = 1;
+				while (uciRangeIndex < distance.size() && v2nd.range <= distance[uciRangeIndex] * 100)
+				{
+					uciRangeIndex++;
+				};
+			}
+		}
+	}
+	if (photo)
 	{
-		uciRangeIndex++;
-	};
-	return r + 1;
+		if (v2nd.IsValid())
+		{
+			memcpy(&v1st, &v2nd, sizeof(v1st));
+			v2nd.Reset();
+		}
+		return 1 + speculation;
+	}
+	return 0;
 }
 
 #if 0
