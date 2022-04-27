@@ -177,9 +177,11 @@ namespace Radar
             void TaskRadarPoll_Reset();
 
             /*********************TaskRange********************/
-            BootTimer tmrRange;
+            BootTimer tmrRange, tmrSpeculation;
             int uciRangeIndex{0};
             iSys::Vehicle v1st, v2nd;
+            bool v1stClosing{false};
+            bool v2ndClosing{false};
             void TaskRangeReSet();
         };
 
