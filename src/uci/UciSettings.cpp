@@ -53,11 +53,11 @@ void UciSettings::LoadConfig()
 		c.name = std::string(sectionBuf);
 		str = GetStr(uciSec, _Distance);
 		int ibuf[DISTANCE_NUMBER];
-		int cnt = Cnvt::GetIntArray(str, DISTANCE_NUMBER, ibuf, 1, 999);
+		int cnt = Cnvt::GetIntArray(str, DISTANCE_NUMBER, ibuf, 1, 15000);
 		c.distance.resize(cnt);
 		for (int i = 0; i < cnt; i++)
 		{
-			c.distance.at(i) = ibuf[i]*100;
+			c.distance.at(i) = ibuf[i];
 		}
 		const char *isys = GetStr(uciSec, _iSys);
 		const char *stalker = GetStr(uciSec, _Stalker);
@@ -69,12 +69,12 @@ void UciSettings::LoadConfig()
 		c.iSys.radarId = GetInt(uciSec, _RadarId, 2, 255, true); // 0 & 1 not allowed
 		c.iSys.radarMode = GetInt(uciSec, _RadarMode, INT_MIN, INT_MAX, true);
 		c.iSys.radarCode = GetInt(uciSec, _RadarCode, INT_MIN, INT_MAX, true);
-		c.iSys.rangeRise = GetInt(uciSec, _RangeRise, 1, 99, true)*100;
-		c.iSys.rangeLast = GetInt(uciSec, _RangeLast, 1, 99, true)*100;
-		c.iSys.minRange = GetInt(uciSec, _MinRange, 1, 99, true)*100;
+		c.iSys.rangeRise = GetInt(uciSec, _RangeRise, 1, 5000, true);
+		c.iSys.rangeLast = GetInt(uciSec, _RangeLast, 1, 5000, true);
+		c.iSys.minRange = GetInt(uciSec, _MinRange, 1, 5000, true);
 		c.iSys.minSignal = GetInt(uciSec, _MinSignal, 1, 99, true);
 		c.iSys.minSpeed = GetInt(uciSec, _MinSpeed, 1, 99, true);
-		c.iSys.cmErr = GetInt(uciSec, _CmErr, 1, 9999, true);
+		c.iSys.cmErr = GetInt(uciSec, _CmErr, 1, 5000, true);
 
 		// stalker
 		uciSec = GetSection(stalker);

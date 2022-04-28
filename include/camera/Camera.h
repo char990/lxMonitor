@@ -11,6 +11,7 @@ public:
     Camera(int id); // id is 1/2/3
     ~Camera();
 
+    bool IsTakingPhoto() { return toTakePhoto; };
     void TakePhoto() { toTakePhoto = true; };
     void ConTakePhoto() { toTakePhoto = true; conTakePhoto = true;};
 
