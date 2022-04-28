@@ -117,7 +117,11 @@ void DebugConsole::Process()
     {
         if (strcmp(argv[0], CMD_LIST[i].cmd) == 0)
         {
-            (*CMD_LIST[i].function)(argc, argv);
+            int x = (*CMD_LIST[i].function)(argc, argv);
+            if(x==-1)
+            {
+                WrongArg();
+            }
             break;
         }
         i++;
@@ -133,7 +137,12 @@ void DebugConsole::Process()
     delete (argv);
 }
 
-void DebugConsole::Cmd_help(int argc, char *argv[])
+void DebugConsole::WrongArg()
+{
+    printf("Wrong argument(s)\n");
+}
+
+int DebugConsole::Cmd_help(int argc, char *argv[])
 {
     PrintDash('-');
     printf("CMD\t| Comments\n");
@@ -143,29 +152,33 @@ void DebugConsole::Cmd_help(int argc, char *argv[])
         printf("%s\t| %s\n", CMD_LIST[i].cmd, CMD_LIST[i].help);
     }
     PrintDash('-');
+    return 0;
 }
 
 extern bool ticktock;
-void DebugConsole::Cmd_t(int argc, char *argv[])
+int DebugConsole::Cmd_t(int argc, char *argv[])
 {
     printf("Ticktock %s\n", ticktock ? "OFF" : "ON");
     ticktock = !ticktock;
+    return 0;
 }
 
 extern void PrintVersion(bool);
-void DebugConsole::Cmd_ver(int argc, char *argv[])
+int DebugConsole::Cmd_ver(int argc, char *argv[])
 {
     PrintVersion(false);
+    return 0;
 }
 
 extern unsigned int ws_hexdump;
-void DebugConsole::Cmd_ws(int argc, char *argv[])
+int DebugConsole::Cmd_ws(int argc, char *argv[])
 {
     printf("Set websocket hexdump %s\n", ws_hexdump ? "OFF" : "ON");
     ws_hexdump = !ws_hexdump;
+    return 0;
 }
 
-void DebugConsole::Cmd_shoot(int argc, char *argv[])
+int DebugConsole::Cmd_shoot(int argc, char *argv[])
 {
     if (argc == 2)
     {
@@ -176,20 +189,20 @@ void DebugConsole::Cmd_shoot(int argc, char *argv[])
             {
             case 'f':
                 cameras[0]->ConTakePhoto();
-                return;
+                return 0;
             case 'm':
                 cameras[2]->ConTakePhoto();
-                return;
+                return 0;
             case 'b':
                 cameras[1]->ConTakePhoto();
-                return;
+                return 0;
             }
         }
     }
-    printf("Wrong argument\nTry 'shoot f|m|b'\n");
+    return -1;
 }
 
-void DebugConsole::Cmd_stkr(int argc, char *argv[])
+int DebugConsole::Cmd_stkr(int argc, char *argv[])
 {
     if (argc == 3)
     {
@@ -198,29 +211,29 @@ void DebugConsole::Cmd_stkr(int argc, char *argv[])
         if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
             monitors[r]->StalkerDebug(s);
-            return;
+            return 0;
         }
     }
-    printf("Wrong argument\n");
+    return -1;
 }
 
-void DebugConsole::Cmd_isys(int argc, char *argv[])
+int DebugConsole::Cmd_isys(int argc, char *argv[])
 {
     if (argc == 2)
     {
-        if(strcmp(argv[1],"on")==0)
+        if (strcmp(argv[1], "on") == 0)
         {
             RelayNcOn();
             iSys400xPwr->PwrOn();
             printf("isys1&2 ON\n");
-            return;
+            return 0;
         }
-        else if(strcmp(argv[1],"off")==0)
+        else if (strcmp(argv[1], "off") == 0)
         {
             RelayNcOff();
             iSys400xPwr->ManualOff();
             printf("isys1&2 OFF\n");
-            return;
+            return 0;
         }
     }
     else if (argc == 3)
@@ -230,8 +243,8 @@ void DebugConsole::Cmd_isys(int argc, char *argv[])
         if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
             monitors[r]->iSysDebug(s);
-            return;
+            return 0;
         }
     }
-    printf("Wrong argument\n");
+    return -1;
 }
