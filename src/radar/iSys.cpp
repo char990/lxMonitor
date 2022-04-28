@@ -20,6 +20,12 @@ iSys400xPower *iSys400xPwr;
 #define RangeCM_sp_us(sp, us) (sp * us / 36000)
 #define Timeval2us(tv) ((int64_t)1000000 * tv.tv_sec + tv.tv_usec)
 
+#define TMR_RANGE 3000
+#define TMR_SPECULATION 2000
+#if TMR_RANGE <= TMR_SPECULATION
+#error TMR_RANGE should greater than TMR_SPECULATION
+#endif
+
 /*****************************
 Radar is iSYS 4001
 ******************************
@@ -348,10 +354,7 @@ iSys400x::iSys400x(UciRadar &uciradar, std::vector<int> &distance)
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::POWER_UP;
 	tmrPwrDelay.Setms(0);
-	TaskRangeReSet();
-	// assume v1st passed
-	v1st.signal = 99;
-	v1st.range = uciradar.rangeLast - 1;
+	Reset();
 }
 
 iSys400x::~iSys400x()
@@ -491,7 +494,7 @@ void iSys400x::CmdReadTargetList()
 
 void iSys400x::Reset()
 {
-	TaskRangeReSet();
+	TaskRangeReset();
 	TaskRadarPoll_Reset();
 }
 
@@ -505,14 +508,10 @@ void iSys400x::TaskRadarPoll_Reset()
 	isConnected = Utils::STATE3::S3_NA;
 }
 
-#define TMR_RANGE 3000
-#define TMR_SPECULATION 2500
-#if TMR_RANGE <= TMR_SPECULATION
-#error TMR_RANGE should greater than TMR_SPECULATION
-#endif
-void iSys400x::TaskRangeReSet()
+
+void iSys400x::TaskRangeReset()
 {
-	uciRangeIndex = distance.size();
+	uciRangeIndex = 0;
 	tmrRange.Setms(TMR_RANGE);
 	tmrSpeculation.Clear();
 	v1st.Reset();
@@ -706,9 +705,10 @@ int iSys400x::CheckRange()
 				if (v1st.range <= distance.back())
 				{
 					photo = 1;
+					uciRangeIndex = distance.size();
 					if (Vdebug() >= 2)
 					{
-						PrintDbg(DBG_PRT, "\tphoto = 1[1]\n");
+						PrintDbg(DBG_PRT, "\tphoto = 1[1]");
 					}
 				}
 			}
@@ -719,7 +719,7 @@ int iSys400x::CheckRange()
 	{
 		if (tmrRange.IsExpired())
 		{
-			TaskRangeReSet();
+			TaskRangeReset();
 			return 0;
 		}
 		if (!v1st.IsValid())
@@ -842,9 +842,9 @@ int iSys400x::CheckRange()
 			tmrSpeculation.Clear();
 			speculation = 0;
 		}
-		else if (speculation && uciRangeIndex == distance.size()) // only v1st && speculation
+		else if (speculation) // only v1st && speculation
 		{
-			TaskRangeReSet();
+			TaskRangeReset();
 		}
 		return r;
 	}

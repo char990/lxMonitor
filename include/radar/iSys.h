@@ -182,7 +182,7 @@ namespace Radar
             iSys::Vehicle v1st, v2nd;
             bool v1stClosing{false};
             bool v2ndClosing{false};
-            void TaskRangeReSet();
+            void TaskRangeReset();
         };
 
     }
