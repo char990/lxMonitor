@@ -21,7 +21,7 @@ iSys400xPower *iSys400xPwr;
 #define Timeval2us(tv) ((int64_t)1000000 * tv.tv_sec + tv.tv_usec)
 
 #define TMR_RANGE 3000
-#define TMR_SPECULATION 2000
+#define TMR_SPECULATION 1000
 #if TMR_RANGE <= TMR_SPECULATION
 #error TMR_RANGE should greater than TMR_SPECULATION
 #endif
@@ -702,6 +702,7 @@ int iSys400x::CheckRange()
 					PrintDbg(DBG_PRT, "\tv1st-Speculation:%s", buf);
 				}
 				speculation = 1;
+#if 1
 				if (v1st.range <= distance.back())
 				{
 					photo = 1;
@@ -711,6 +712,7 @@ int iSys400x::CheckRange()
 						PrintDbg(DBG_PRT, "\tphoto = 1[1]");
 					}
 				}
+#endif
 			}
 		}
 	};
@@ -774,6 +776,7 @@ int iSys400x::CheckRange()
 			}
 		}
 	}
+	#if 1
 	if (!speculation)
 	{ // v1st must be valid, so only check v1st
 		if (targetlist.IsClosing())
@@ -830,6 +833,71 @@ int iSys400x::CheckRange()
 			}
 		}
 	}
+	#else
+	// v1st must be valid
+	if (!v2nd.IsValid())
+	{ // v2nd not valid
+		if (targetlist.IsClosing())
+		{
+			v1stClosing = true;
+		}
+		if(v1stClosing)
+		{
+			if (uciRangeIndex < distance.size())
+			{
+				if (v1st.range <= distance[uciRangeIndex])
+				{
+					photo = 1;
+					if (Vdebug() >= 2)
+					{
+						PrintDbg(DBG_PRT, "\tphoto = 1[2], uciRangeIndex=%d", uciRangeIndex);
+					}
+					while (uciRangeIndex < distance.size() && v1st.range <= distance[uciRangeIndex])
+					{
+						uciRangeIndex++;
+					};
+					if (Vdebug() >= 2)
+					{
+						PrintDbg(DBG_PRT, "\tuciRangeIndex=%d", uciRangeIndex);
+					}
+				}
+				else if (0) // Vdebug() >= 2)
+				{
+					PrintDbg(DBG_PRT, "\tFALSE 1: uciRangeIndex=%d, v1st.range=%d", uciRangeIndex, v1st.range);
+				}
+			}
+		}
+	}
+	else
+	{ // v2nd valid
+		if (targetlist.IsClosing())
+		{
+			v2ndClosing = true;
+		}
+		if(v2ndClosing)
+		{	
+			if (uciRangeIndex < distance.size())
+			{
+				if (v2nd.range <= distance[uciRangeIndex])
+				{
+					photo = 1;
+					if (Vdebug() >= 2)
+					{
+						PrintDbg(DBG_PRT, "\tphoto = 1[3]");
+					}
+					while (uciRangeIndex < distance.size() && v2nd.range <= distance[uciRangeIndex])
+					{
+						uciRangeIndex++;
+					};
+				}
+				else if (0) // Vdebug() >= 2)
+				{
+					PrintDbg(DBG_PRT, "\tFALSE 2: uciRangeIndex=%d, v2nd.range=%d", uciRangeIndex, v2nd.range);
+				}
+			}
+		}
+	}
+	#endif
 	if (photo)
 	{
 		int r = 1 + speculation;
