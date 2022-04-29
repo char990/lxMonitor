@@ -21,7 +21,7 @@ namespace Radar
     class IRadar : public IRxCallback
     {
     public:
-        IRadar(UciRadar &uciradar) : uciradar(uciradar) { ReloadTmrssTimeout(); };
+        IRadar(UciRadar &uciradar) : uciradar(uciradar) {};
         virtual int RxCallback(uint8_t *buf, int len) = 0;
         virtual RadarStatus GetStatus() { return radarStatus;};
         virtual void SetStatus(RadarStatus s) { radarStatus = s; };
@@ -45,6 +45,5 @@ namespace Radar
         OprSp *oprSp{nullptr};
         RadarStatus radarStatus{RadarStatus::POWER_UP};
         BootTimer ssTimeout;
-        virtual void ReloadTmrssTimeout() { ssTimeout.Setms(500); };
     };
 }

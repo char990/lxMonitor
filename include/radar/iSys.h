@@ -166,9 +166,7 @@ namespace Radar
 
             void ClearRxBuf() { oprSp->ClearRx(); };
 
-            virtual void ReloadTmrssTimeout() override;
-
-            /*********************TaskRadarPoll_********************/
+                        /*********************TaskRadarPoll_********************/
             BootTimer tmrPwrDelay;
             int pwrDelay{0};
             BootTimer tmrTaskRadar;

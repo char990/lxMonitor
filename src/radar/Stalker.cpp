@@ -86,9 +86,9 @@ int VehicleList::PushDgb1(const char *dbg1)
             hasVehicle = false;
             gettimeofday(&time, nullptr);
             newVehicle = false;
-            if (vdebug>=3)
+            vlist.clear(); // as there is no vhicle, clear all vehicles in list
+            if (vdebug>=2)
             {
-                vlist.clear(); // as there is no vhicle, clear all vehicles in list
                 Print();
             }
         }
@@ -191,7 +191,7 @@ StalkerStat::StalkerStat(UciRadar &uciradar)
 {
     oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, this);
     radarStatus = RadarStatus::READY;
-    ReloadTmrssTimeout();
+    ssTimeout.Setms(STALKER_TIMEOUT);
 }
 
 StalkerStat::~StalkerStat()
@@ -213,9 +213,10 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
         }
         else if (c == '\x0D')
         {
-            ReloadTmrssTimeout();
-            if (dbg1len == DBG1_SIZE - 1 || dbg1len == 0)
+            if (dbg1len == DBG1_SIZE - 1)// || dbg1len == 0)
             {
+                ssTimeout.Setms(STALKER_TIMEOUT);
+                //printf("STALKER_TIMEOUT reload\n");
                 dbg1buf[dbg1len] = '\0';
                 if(vehicleList.PushDgb1((const char *)dbg1buf)>=0)
                 {
@@ -256,6 +257,8 @@ RadarStatus StalkerStat::GetStatus()
         dbg1buf[0] = 0;
         vehicleList.PushDgb1((const char *)dbg1buf);
         radarStatus = RadarStatus::EVENT;
+        ssTimeout.Clear();
+        //PrintDbg(DBG_PRT, "%s ssTimeout\n", uciradar.name.c_str());
     }
     return radarStatus;
 }

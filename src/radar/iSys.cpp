@@ -20,6 +20,8 @@ iSys400xPower *iSys400xPwr;
 #define RangeCM_sp_us(sp, us) (sp * us / 36000)
 #define Timeval2us(tv) ((int64_t)1000000 * tv.tv_sec + tv.tv_usec)
 
+#define ISYS_TIMEOUT (ISYS_PWR_0_T + ISYS_PWR_1_T + 1000)
+
 #define TMR_RANGE 3000
 #define TMR_SPECULATION 1000
 #if TMR_RANGE <= TMR_SPECULATION
@@ -504,10 +506,9 @@ void iSys400x::TaskRadarPoll_Reset()
 	ClearRxBuf();
 	taskRadarPoll_ = 0;
 	targetlist.Reset();
-	ReloadTmrssTimeout();
+	ssTimeout.Setms(ISYS_TIMEOUT);
 	isConnected = Utils::STATE3::S3_NA;
 }
-
 
 void iSys400x::TaskRangeReset()
 {
@@ -576,7 +577,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	PT_BEGIN();
 	while (true)
 	{
-		ReloadTmrssTimeout();
+		ssTimeout.Setms(ISYS_TIMEOUT);
 		// get device name
 		radarStatus = RadarStatus::POWER_UP;
 		do
@@ -590,7 +591,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				if (DecodeDeviceName() == 0)
 				{
 					radarStatus = RadarStatus::EVENT;
-					ReloadTmrssTimeout();
+					ssTimeout.Setms(ISYS_TIMEOUT);
 				}
 			}
 		} while (radarStatus != RadarStatus::EVENT);
@@ -612,7 +613,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			else
 			{
 				radarStatus = RadarStatus::EVENT;
-				ReloadTmrssTimeout();
+				ssTimeout.Setms(ISYS_TIMEOUT);
 			}
 		} while (radarStatus != RadarStatus::EVENT);
 		PT_YIELD();
@@ -640,7 +641,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 						targetlist.Refresh();
 					}
 					radarStatus = RadarStatus::EVENT;
-					ReloadTmrssTimeout();
+					ssTimeout.Setms(ISYS_TIMEOUT);
 				}
 			}
 		} while (true);
@@ -667,11 +668,6 @@ int iSys400x::SaveMeta(const char *comment, const char *details)
 		PrintDbg(DBG_PRT, "\tMeta=%s,%s\n", comment, details);
 	}
 	return targetlist.SaveMeta(comment, details);
-}
-
-void iSys400x::ReloadTmrssTimeout()
-{
-	ssTimeout.Setms(ISYS_PWR_0_T + ISYS_PWR_1_T + 1000);
 }
 
 int iSys400x::CheckRange()
@@ -776,7 +772,7 @@ int iSys400x::CheckRange()
 			}
 		}
 	}
-	#if 1
+#if 1
 	if (!speculation)
 	{ // v1st must be valid, so only check v1st
 		if (targetlist.IsClosing())
@@ -833,7 +829,7 @@ int iSys400x::CheckRange()
 			}
 		}
 	}
-	#else
+#else
 	// v1st must be valid
 	if (!v2nd.IsValid())
 	{ // v2nd not valid
@@ -841,7 +837,7 @@ int iSys400x::CheckRange()
 		{
 			v1stClosing = true;
 		}
-		if(v1stClosing)
+		if (v1stClosing)
 		{
 			if (uciRangeIndex < distance.size())
 			{
@@ -874,8 +870,8 @@ int iSys400x::CheckRange()
 		{
 			v2ndClosing = true;
 		}
-		if(v2ndClosing)
-		{	
+		if (v2ndClosing)
+		{
 			if (uciRangeIndex < distance.size())
 			{
 				if (v2nd.range <= distance[uciRangeIndex])
@@ -897,7 +893,7 @@ int iSys400x::CheckRange()
 			}
 		}
 	}
-	#endif
+#endif
 	if (photo)
 	{
 		int r = 1 + speculation;
