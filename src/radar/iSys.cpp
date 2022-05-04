@@ -133,7 +133,7 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 	}
 	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
 	memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
-	isColsing = false;
+	isClosing = false;
 	for (int i = 0; i < VF_SIZE; i++)
 	{
 		int usec = items[i + 1].usec - items[i].usec;
@@ -149,13 +149,15 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 			return;
 		}
 	}
-	isColsing = true;
+	isClosing = true;
+	isSlowdown = items[0].speed > items[1].speed && items[1].speed > items[2].speed;
 };
 
 void VehicleFilter::Reset()
 {
 	bzero(items, sizeof(items));
-	isColsing = false;
+	isClosing = false;
+	isSlowdown = false;
 }
 
 void TargetList::Reset()
@@ -210,7 +212,7 @@ int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
 		// angle
 		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
 		pData += 2;
-		if (v.signal >= uciradar.minSignal && v.speed >= uciradar.minSpeed && v.range >= uciradar.minRange)
+		if (v.signal >= uciradar.minSignal && v.speed >= uciradar.minSpeed && v.speed <= uciradar.maxSpeed && v.range >= uciradar.minRange)
 		{
 			cnt++;
 		}
@@ -496,8 +498,8 @@ void iSys400x::CmdReadTargetList()
 
 void iSys400x::Reset()
 {
-	TaskRangeReset();
 	TaskRadarPoll_Reset();
+	TaskRangeReset();
 }
 
 void iSys400x::TaskRadarPoll_Reset()
@@ -512,13 +514,10 @@ void iSys400x::TaskRadarPoll_Reset()
 
 void iSys400x::TaskRangeReset()
 {
-	uciRangeIndex = 0;
-	tmrRange.Setms(TMR_RANGE);
+	tmrRange.Clear();
 	tmrSpeculation.Clear();
 	v1st.Reset();
-	v1stClosing = false;
 	v2nd.Reset();
-	v2ndClosing = false;
 }
 
 bool iSys400x::TaskRadarPoll()
@@ -670,14 +669,13 @@ int iSys400x::SaveMeta(const char *comment, const char *details)
 	return targetlist.SaveMeta(comment, details);
 }
 
-int iSys400x::CheckRange()
+#define NO_PHOTO -1
+int iSys400x::CheckRange(int & speed)
 {
-	auto v = targetlist.minRangeVehicle;
 	int speculation = 0;
-	int photo = 0;
 	auto Speculate_v1st = [&]
 	{
-		if (v1st.IsValid() && v1stClosing && (uciRangeIndex < distance.size()) && !tmrSpeculation.IsExpired())
+		if (v1st.IsValid() && v1st.isClosing && (v1st.uciRangeIndex < distance.size()) && !tmrSpeculation.IsExpired())
 		{ // refresh v1st based on speculation
 			if (tmrSpeculation.IsClear())
 			{
@@ -686,43 +684,37 @@ int iSys400x::CheckRange()
 			struct timeval tv;
 			gettimeofday(&tv, nullptr);
 			int64_t usec = Timeval2us(tv);
-			int us = usec - v1st.usec;
+			int us = usec - v1st.vk.usec;
 			if (us > 0)
 			{
-				v1st.usec = usec;
-				v1st.range -= RangeCM_sp_us(v1st.speed, us);
+				v1st.vk.usec = usec;
+				v1st.vk.range -= RangeCM_sp_us(v1st.vk.speed, us);
 				if (Vdebug() >= 2)
 				{
 					char buf[128];
-					v1st.Print(buf);
+					v1st.vk.Print(buf);
 					PrintDbg(DBG_PRT, "\tv1st-Speculation:%s", buf);
 				}
 				speculation = 1;
-#if 1
-				if (v1st.range <= distance.back())
-				{
-					photo = 1;
-					uciRangeIndex = distance.size();
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tphoto = 1[1]");
-					}
-				}
-#endif
 			}
 		}
 	};
 
+	auto v = targetlist.minRangeVehicle;
 	if (v == nullptr)
 	{
 		if (tmrRange.IsExpired())
 		{
+			if (Vdebug() >= 2)
+			{
+				PrintDbg(DBG_PRT, "tmrRange.IsExpired");
+			}
 			TaskRangeReset();
-			return 0;
+			return NO_PHOTO;
 		}
-		if (!v1st.IsValid())
+		if (!v1st.IsValid() || v1st.vk.range < distance.back())
 		{
-			return 0;
+			return NO_PHOTO;
 		}
 		Speculate_v1st();
 	}
@@ -732,54 +724,114 @@ int iSys400x::CheckRange()
 		tmrSpeculation.Clear();
 		if (!v1st.IsValid())
 		{
-			memcpy(&v1st, v, sizeof(v1st));
+			if (v->range < distance.back())
+			{
+				return NO_PHOTO;
+			}
+			v1st.Reset();
+			v1st.Loadvk(v);
 			speculation = 0;
 		}
 		else
 		{
+			if (v1st.uciRangeIndex == 0 && v->range < distance.back())
+			{
+				return NO_PHOTO;
+			}
 			if (v2nd.IsValid())
 			{ // with v2nd exists, isys lost v1st
 				Speculate_v1st();
-				memcpy(&v2nd, v, sizeof(v2nd));
+				v2nd.Loadvk(v);
 			}
 			else
 			{ // no v2nd, there is only v1st
-				if (v1st.range < uciradar.rangeLast && v->range > v1st.range + uciradar.rangeRise)
+				if (v1st.vk.range < uciradar.rangeLast && v->range > v1st.vk.range + uciradar.rangeRise)
 				{ // range suddenly changed, means new vehicle
+					// this is v2nd
+					Speculate_v1st();
+					v2nd.Reset();
+					v2nd.Loadvk(v);
 					if (Vdebug() >= 2)
 					{
-						PrintDbg(DBG_PRT, "\tuciRangeIndex=%d->0\tv1st.range=%d, v->range=%d",
-								 uciRangeIndex, v1st.range, v->range);
+						PrintDbg(DBG_PRT, "\tnew v2 : v->range=%d", v->range);
 					}
-					if (uciRangeIndex == distance.size())
-					{ // restart, this is v1st
-						memcpy(&v1st, v, sizeof(v1st));
-						speculation = 0;
-					}
-					else
-					{ // this is v2nd
-						Speculate_v1st();
-						memcpy(&v2nd, v, sizeof(v2nd));
-						v2ndClosing = false;
-					}
-					uciRangeIndex = 0;
 				}
 				else
 				{
-					memcpy(&v1st, v, sizeof(v1st));
+					v1st.Loadvk(v);
 					speculation = 0;
 				}
 			}
 		}
+		if (targetlist.IsClosing())
+		{
+			if (v1st.IsValid())
+			{
+				v1st.isClosing = true;
+			}
+			if (v2nd.IsValid())
+			{
+				v2nd.isClosing = true;
+			}
+		}
 	}
-#if 1
+
+	int photo = NO_PHOTO;
+	if (v1st.isClosing && v1st.uciRangeIndex < distance.size())
+	{
+		if ((v1st.uciRangeIndex != 0 || v1st.vk.range > distance.back()) && v1st.vk.range <= distance[v1st.uciRangeIndex])
+		{
+			photo = 1;
+			speed = v1st.vk.speed;
+			if (Vdebug() >= 2)
+			{
+				PrintDbg(DBG_PRT, "\tphoto = [1]:uciRangeIndex=[%d]", v1st.uciRangeIndex);
+			}
+			while (v1st.uciRangeIndex < distance.size() && v1st.vk.range <= distance[v1st.uciRangeIndex])
+			{
+				v1st.uciRangeIndex++;
+			};
+			if (Vdebug() >= 2)
+			{
+				PrintDbg(DBG_PRT, "\tv[1]st.uciRangeIndex=[%d]", v1st.uciRangeIndex);
+			}
+		}
+	}
+	if (v2nd.IsValid())
+	{
+		if (v2nd.isClosing && v2nd.uciRangeIndex < distance.size())
+		{
+			if (v2nd.vk.range <= distance[v2nd.uciRangeIndex])
+			{
+				photo = 2;
+				speed = v2nd.vk.speed;
+				if (Vdebug() >= 2)
+				{
+					PrintDbg(DBG_PRT, "\tphoto = [2]:uciRangeIndex=[%d]", v2nd.uciRangeIndex);
+				}
+				while (v2nd.uciRangeIndex < distance.size() && v2nd.vk.range <= distance[v2nd.uciRangeIndex])
+				{
+					v2nd.uciRangeIndex++;
+				};
+			}
+		}
+	}
+
+#if 0
 	if (!speculation)
 	{ // v1st must be valid, so only check v1st
 		if (targetlist.IsClosing())
 		{
 			v1stClosing = true;
+		}
+		if (v1stClosing)
+		{
 			if (uciRangeIndex < distance.size())
 			{
+				if(uciRangeIndex == 0 && v1st.range < distance.back())
+				{
+					return 0;	// expect a vehicle at far, ignore this
+				}
 				if (v1st.range <= distance[uciRangeIndex])
 				{
 					photo = 1;
@@ -805,114 +857,59 @@ int iSys400x::CheckRange()
 	}
 	else
 	{ // speculation is running & check v2nd as well
-		if (v2nd.IsValid() && targetlist.IsClosing())
+		if (v2nd.IsValid())
 		{
-			v2ndClosing = true;
-			if (uciRangeIndex < distance.size())
+			if (targetlist.IsClosing())
 			{
-				if (v2nd.range <= distance[uciRangeIndex])
-				{
-					photo = 1;
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tphoto = 1[3]");
-					}
-					while (uciRangeIndex < distance.size() && v2nd.range <= distance[uciRangeIndex])
-					{
-						uciRangeIndex++;
-					};
-				}
-				else if (0) // Vdebug() >= 2)
-				{
-					PrintDbg(DBG_PRT, "\tFALSE 2: uciRangeIndex=%d, v2nd.range=%d", uciRangeIndex, v2nd.range);
-				}
+				v2ndClosing = true;
 			}
-		}
-	}
-#else
-	// v1st must be valid
-	if (!v2nd.IsValid())
-	{ // v2nd not valid
-		if (targetlist.IsClosing())
-		{
-			v1stClosing = true;
-		}
-		if (v1stClosing)
-		{
-			if (uciRangeIndex < distance.size())
+			if (v2ndClosing)
 			{
-				if (v1st.range <= distance[uciRangeIndex])
+				if (uciRangeIndex < distance.size())
 				{
-					photo = 1;
-					if (Vdebug() >= 2)
+					if (v2nd.range <= distance[uciRangeIndex])
 					{
-						PrintDbg(DBG_PRT, "\tphoto = 1[2], uciRangeIndex=%d", uciRangeIndex);
+						photo = 1;
+						if (Vdebug() >= 2)
+						{
+							PrintDbg(DBG_PRT, "\tphoto = 1[3]");
+						}
+						while (uciRangeIndex < distance.size() && v2nd.range <= distance[uciRangeIndex])
+						{
+							uciRangeIndex++;
+						};
 					}
-					while (uciRangeIndex < distance.size() && v1st.range <= distance[uciRangeIndex])
+					else if (0) // Vdebug() >= 2)
 					{
-						uciRangeIndex++;
-					};
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tuciRangeIndex=%d", uciRangeIndex);
+						PrintDbg(DBG_PRT, "\tFALSE 2: uciRangeIndex=%d, v2nd.range=%d", uciRangeIndex, v2nd.range);
 					}
-				}
-				else if (0) // Vdebug() >= 2)
-				{
-					PrintDbg(DBG_PRT, "\tFALSE 1: uciRangeIndex=%d, v1st.range=%d", uciRangeIndex, v1st.range);
-				}
-			}
-		}
-	}
-	else
-	{ // v2nd valid
-		if (targetlist.IsClosing())
-		{
-			v2ndClosing = true;
-		}
-		if (v2ndClosing)
-		{
-			if (uciRangeIndex < distance.size())
-			{
-				if (v2nd.range <= distance[uciRangeIndex])
-				{
-					photo = 1;
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tphoto = 1[3]");
-					}
-					while (uciRangeIndex < distance.size() && v2nd.range <= distance[uciRangeIndex])
-					{
-						uciRangeIndex++;
-					};
-				}
-				else if (0) // Vdebug() >= 2)
-				{
-					PrintDbg(DBG_PRT, "\tFALSE 2: uciRangeIndex=%d, v2nd.range=%d", uciRangeIndex, v2nd.range);
 				}
 			}
 		}
 	}
 #endif
-	if (photo)
+	if (photo == 1)
 	{
-		int r = 1 + speculation;
-		if (v2nd.IsValid())
-		{
-			memcpy(&v1st, &v2nd, sizeof(v1st));
-			v1stClosing = v2ndClosing;
-			v2nd.Reset();
-			v2ndClosing = false;
-			tmrSpeculation.Clear();
-			speculation = 0;
-		}
-		else if (speculation) // only v1st && speculation
+		photo = speculation ? distance.size() : v1st.uciRangeIndex-1;
+		if (speculation || v1st.uciRangeIndex == distance.size()) // only v1st && speculation
 		{
 			TaskRangeReset();
 		}
-		return r;
+		if (v2nd.IsValid())
+		{
+			v1st.Clone(v2nd);
+			v2nd.Reset();
+			tmrSpeculation.Clear();
+		}
 	}
-	return 0;
+	else if (photo == 2)
+	{
+		v1st.Clone(v2nd);
+		v2nd.Reset();
+		tmrSpeculation.Clear();
+		photo = v2nd.uciRangeIndex-1;
+	}
+	return photo;
 }
 
 #if 0

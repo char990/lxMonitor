@@ -2,9 +2,9 @@
 
 void BootTimer::Setms(long ms)
 {
-    if(ms<0||ms==LONG_MAX)
+    if(ms<0)
     {
-        ns=0;
+        ns=1000000;
         sec=LONG_MAX;   // time_t is long
         return;
     }
@@ -21,9 +21,9 @@ void BootTimer::Setms(long ms)
 
 void BootTimer::Setus(long us)
 {
-    if(us<0||us==LONG_MAX)
+    if(us<0)
     {
-        ns=0;
+        ns=1000000;
         sec=LONG_MAX;   // time_t is long
         return;
     }
@@ -40,7 +40,7 @@ void BootTimer::Setus(long us)
 
 bool BootTimer::IsExpired()
 {
-    if(sec==LONG_MAX) return false;
+    if(sec==LONG_MAX && ns == 1000000) return false;
     struct timespec _CLOCK_BOOTTIME;
     clock_gettime(CLOCK_BOOTTIME, &_CLOCK_BOOTTIME);
     return ((_CLOCK_BOOTTIME.tv_sec>sec) ||
@@ -49,5 +49,5 @@ bool BootTimer::IsExpired()
 
 void BootTimer::Clear()
 {
-    Setms(LONG_MAX);
+    Setms(-1);
 }

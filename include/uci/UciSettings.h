@@ -28,6 +28,7 @@ public:
     int rangeRise{-1};
     int minRange{-1};
     int minSpeed{-1};
+    int maxSpeed{-1};
     int minSignal{-1};
     int cmErr{-1};
 };
@@ -39,6 +40,8 @@ public:
     UciRadar iSys;
     UciRadar stalker;
     std::vector<int> distance;
+    int vstopDelay;
+    int vstopSpeed;
 };
 
 class UciSettings : public UciCfg
@@ -72,8 +75,9 @@ private:
     const char *_Monitor = "Monitor";       // section
     const char *_iSys = "iSys";
     const char *_Stalker = "Stalker";
-    const char *_Output = "Output";
     const char *_Distance = "Distance";
+    const char *_VstopDelay = "VstopDelay";
+    const char *_VstopSpeed = "VstopSpeed";
     // Radar    
     const char *_RadarPort = "RadarPort";
     const char *_RadarBps = "RadarBps";
@@ -84,6 +88,7 @@ private:
     const char *_RangeLast = "RangeLast";
     const char *_MinRange = "MinRange";
     const char *_MinSpeed = "MinSpeed";
+    const char *_MaxSpeed = "MaxSpeed";
     const char *_MinSignal = "MinSignal";
     const char *_CmErr = "CmErr";
 

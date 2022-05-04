@@ -55,7 +55,8 @@ namespace Radar
             };
             void PushVehicle(Vehicle *v);
             Vehicle items[VF_SIZE + 1];
-            bool isColsing{false};
+            bool isClosing{false};
+            bool isSlowdown{false};
             int cmErr;
             void Reset();
         };
@@ -86,7 +87,7 @@ namespace Radar
             /// \brief refresh minRangeVehicle and run vehicle filter to see if this is closing vehicle
             void Refresh();
             Vehicle *minRangeVehicle;
-            bool IsClosing() { return vfilter.isColsing; };
+            bool IsClosing() { return vfilter.isClosing; };
             uint64_t GetPktTime() { return pktTime.tv_sec * 1000000 + pktTime.tv_usec; };
 
         private:
@@ -124,6 +125,36 @@ namespace Radar
             BootTimer tmrRePwr;
         };
 
+        class Range
+        {
+        public:
+            Vehicle vk;
+            bool isClosing{false};
+            int uciRangeIndex{0};
+            void Clone(Range *v)
+            {
+                if (v != this)
+                {
+                    memcpy(this, v, sizeof(Range));
+                }
+            }
+            void Clone(Range &v)
+            {
+                Clone(&v);
+            }
+            void Reset()
+            {
+                isClosing = false;
+                uciRangeIndex = 0;
+                vk.Reset();
+            }
+            bool IsValid() { return vk.IsValid(); }
+            void Loadvk(Vehicle * v)
+            {
+                memcpy(&vk, v, sizeof(Vehicle));
+            }
+        };
+
         class iSys400x : public IRadar
         {
         public:
@@ -142,8 +173,8 @@ namespace Radar
 
             TargetList targetlist;
 
-            /// \return 0:Normal; 1:Take photo by setting; 2:Take photo by speculation
-            int CheckRange();
+            /// \return -1:Normal; 0~disatance.size()-1:Take photo by setting; disatance.size():Take photo by speculation
+            int CheckRange(int & speed);
 
         protected:
             std::vector<int> &distance;
@@ -166,7 +197,7 @@ namespace Radar
 
             void ClearRxBuf() { oprSp->ClearRx(); };
 
-                        /*********************TaskRadarPoll_********************/
+            /*********************TaskRadarPoll_********************/
             BootTimer tmrPwrDelay;
             int pwrDelay{0};
             BootTimer tmrTaskRadar;
@@ -176,10 +207,7 @@ namespace Radar
 
             /*********************TaskRange********************/
             BootTimer tmrRange, tmrSpeculation;
-            int uciRangeIndex{0};
-            iSys::Vehicle v1st, v2nd;
-            bool v1stClosing{false};
-            bool v2ndClosing{false};
+            Range v1st, v2nd;
             void TaskRangeReset();
         };
 

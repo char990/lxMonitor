@@ -17,12 +17,14 @@ public:
 
     virtual void PeriodicRun() override;
 
-    GpioIn * Alarm(){ return alarm;};
+    GpioIn *alarm;
+    int vdebug{0};
+    int alarm_dbg{-1};
 
+    int Id(){return id;};
 private:
     int id;
     GpioOut *takephoto;
-    GpioIn *alarm;
     bool toTakePhoto{false};
     bool conTakePhoto{false};
     int taskTakePhotoLine{0};

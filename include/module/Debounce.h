@@ -91,7 +91,7 @@ public:
         cnt1 = 0;
     }
 
-    void State()
+    void Print()
     {
         printf("CNT0:%d CNT1:%d cnt0=%d cnt1=%d State=%s\n", CNT0, CNT1, cnt0, cnt1, Utils::State5::State());
     }

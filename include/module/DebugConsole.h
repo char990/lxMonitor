@@ -30,7 +30,7 @@ private:
     static int Cmd_t(int argc, char *argv[]);
     static int Cmd_ver(int argc, char *argv[]);
     static int Cmd_ws(int argc, char *argv[]);
-    static int Cmd_shoot(int argc, char *argv[]);
+    static int Cmd_cam(int argc, char *argv[]);
     static int Cmd_isys(int argc, char *argv[]);
     static int Cmd_stkr(int argc, char *argv[]);
 

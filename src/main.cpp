@@ -108,9 +108,9 @@ void GpioInit()
     pOutput[1] = new GpioOut(PIN_BATTERY_LOW, 1);
     pOutput[2] = new GpioOut(PIN_BATTERY_OPEN, 1);
     
-    pInput[0] = pPinIn1 = new GpioIn(5, 5, PIN_G1_MSG2); // read in tmrEvt10ms
-    pInput[1] = pPinIn2 = new GpioIn(5, 5, PIN_G1_MSG1); // read in tmrEvt10ms
-    pInput[2] = pPinIn3 = new GpioIn(5, 5, PIN_G1_AUTO); // read in tmrEvt10ms
+    pInput[0] = pPinIn1 = new GpioIn(5, 5, PIN_MSG3); // read in tmrEvt10ms
+    pInput[1] = pPinIn2 = new GpioIn(5, 5, PIN_MSG4); // read in tmrEvt10ms
+    pInput[2] = pPinIn3 = new GpioIn(5, 5, PIN_MSG5); // read in tmrEvt10ms
 
     pPinRelay = new GpioOut(PIN_RELAY_CTRL, RELAY_NC_ON);     // relay off
     Utils::Time::SleepMs(1000);                    // must sleep 1 second to GpioOut stable
@@ -190,20 +190,19 @@ int main(int argc, char *argv[])
         //tmrEvt1000ms->Add(controller);
 
         // Camera3
-        cameras[0] = new Camera(1);     // FCAM
-        tmrEvt100ms->Add(cameras[0]);
-        cameras[1] = new Camera(2);     // BCAM
-        tmrEvt100ms->Add(cameras[1]);
-        cameras[2] = new Camera(3);     // MCAM
-        tmrEvt100ms->Add(cameras[2]);
+        for(int i=0;i<3;i++)
+        {
+            cameras[i] = new Camera(i+1);
+            tmrEvt100ms->Add(cameras[i]);
+        }
 
         iSys400xPwr = new Radar::iSys::iSys400xPower();
         tmrEvt100ms->Add(iSys400xPwr);
 
         // monitor
-        monitors[0] = new Monitor(1, cameras[0], cameras[2]);
+        monitors[0] = new Monitor(1, cameras[0], cameras[1]);
         tmrEvt10ms->Add(monitors[0]);
-        monitors[1] = new Monitor(2, cameras[1], nullptr);
+        monitors[1] = new Monitor(2, cameras[2], nullptr);
         tmrEvt10ms->Add(monitors[1]);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");

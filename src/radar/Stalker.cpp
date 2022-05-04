@@ -9,7 +9,7 @@ using namespace Radar::Stalker;
 
 using namespace Utils;
 
-#define STALKER_TIMEOUT 1000 // 1000ms
+#define STALKER_TIMEOUT_MS 2000
 
 /**************************DBG1*************************/
 void DBG1::Init(const char *dbg1)
@@ -87,7 +87,7 @@ int VehicleList::PushDgb1(const char *dbg1)
             gettimeofday(&time, nullptr);
             newVehicle = false;
             vlist.clear(); // as there is no vhicle, clear all vehicles in list
-            if (vdebug>=2)
+            if (vdebug >= 2)
             {
                 Print();
             }
@@ -125,11 +125,11 @@ int VehicleList::PushDgb1(const char *dbg1)
                 newv->dbg1list.push_back(d);
                 vlist.push_back(newv);
                 newVehicle = true;
-                if (vdebug>=2)
+                if (vdebug >= 2)
                 {
                     PrintDbg(DBG_PRT, "New Vehicle:ID=%04d", d->id);
                 }
-                if (vdebug>=3)
+                if (vdebug >= 3)
                 {
                     Print();
                 }
@@ -159,15 +159,15 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
     while (v != vlist.end())
     {
         auto t = (*v)->dbg1list.back()->time;
-        if (lasttime.tv_sec != 0 && Time::TimevalSubtract(&lasttime, &t) > STALKER_TIMEOUT * 1000)
+        if (lasttime.tv_sec != 0 && Time::TimevalSubtract(&lasttime, &t) > STALKER_TIMEOUT_MS * 1000)
         { // vehicle disappeared
             auto id = (*v)->dbg1list.back()->id;
             v = vlist.erase(v); // erase current and iterate next
-            if (vdebug>=2)
+            if (vdebug >= 2)
             {
                 PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
             }
-            if (vdebug>=3)
+            if (vdebug >= 3)
             {
                 Print();
             }
@@ -191,7 +191,7 @@ StalkerStat::StalkerStat(UciRadar &uciradar)
 {
     oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, this);
     radarStatus = RadarStatus::READY;
-    ssTimeout.Setms(STALKER_TIMEOUT);
+    ssTimeout.Setms(STALKER_TIMEOUT_MS);
 }
 
 StalkerStat::~StalkerStat()
@@ -213,16 +213,16 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
         }
         else if (c == '\x0D')
         {
-            if (dbg1len == DBG1_SIZE - 1)// || dbg1len == 0)
+            if (dbg1len == DBG1_SIZE - 1) // || dbg1len == 0)
             {
-                ssTimeout.Setms(STALKER_TIMEOUT);
-                //printf("STALKER_TIMEOUT reload\n");
+                ssTimeout.Setms(STALKER_TIMEOUT_MS);
+                // printf("STALKER_TIMEOUT_MS reload\n");
                 dbg1buf[dbg1len] = '\0';
-                if(vehicleList.PushDgb1((const char *)dbg1buf)>=0)
+                if (vehicleList.PushDgb1((const char *)dbg1buf) >= 0)
                 {
-                    if (dbg1len != 0 && Vdebug()>=3)
+                    if (dbg1len != 0 && Vdebug() >= 3)
                     {
-                        printf("%s\n", dbg1buf);
+                        PrintDbg(DBG_PRT, "%s", dbg1buf);
                     }
                 }
                 radarStatus = RadarStatus::EVENT;
@@ -258,7 +258,10 @@ RadarStatus StalkerStat::GetStatus()
         vehicleList.PushDgb1((const char *)dbg1buf);
         radarStatus = RadarStatus::EVENT;
         ssTimeout.Clear();
-        //PrintDbg(DBG_PRT, "%s ssTimeout\n", uciradar.name.c_str());
+        if (Vdebug() >= 2)
+        {
+            PrintDbg(DBG_PRT, "%s ssTimeout\n", uciradar.name.c_str());
+        }
     }
     return radarStatus;
 }

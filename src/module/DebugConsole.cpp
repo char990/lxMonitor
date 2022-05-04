@@ -22,14 +22,15 @@ const Command DebugConsole::CMD_LIST[] = {
     /*{"ws",
      "Set websocket hexdump ON/OFF",
      DebugConsole::Cmd_ws},*/
-    {"shoot",
-     "Take photo by camera f|m|b. Usage: shoot f|m|b",
-     DebugConsole::Cmd_shoot},
+    {"cam",
+     "Take photo by camera 1-. Usage: cam 1-3\n"
+     "\t| Set camera 1-3 debug. Usage: cam 1-3 X",
+     DebugConsole::Cmd_cam},
     {"stkr",
-     "Stalker 1|2 debug info 0-3. Usage: stkr 1|2 0-3",
+     "Stalker 1|2 debug info X. Usage: stkr 1|2 X",
      DebugConsole::Cmd_stkr},
     {"isys",
-     "iSys400x 1|2 debug info 0-3. Usage: isys 1|2 0-3\n"
+     "iSys400x 1|2 debug info X. Usage: isys 1|2 X\n"
      "\t| iSys400x power on|off. Usage: isys on|off",
      DebugConsole::Cmd_isys},
 };
@@ -118,7 +119,7 @@ void DebugConsole::Process()
         if (strcmp(argv[0], CMD_LIST[i].cmd) == 0)
         {
             int x = (*CMD_LIST[i].function)(argc, argv);
-            if(x==-1)
+            if (x == -1)
             {
                 WrongArg();
             }
@@ -178,28 +179,30 @@ int DebugConsole::Cmd_ws(int argc, char *argv[])
     return 0;
 }
 
-int DebugConsole::Cmd_shoot(int argc, char *argv[])
+int DebugConsole::Cmd_cam(int argc, char *argv[])
 {
-    if (argc == 2)
+    char c;
+    if (argc >= 2)
     {
-        char c;
-        if (sscanf(argv[1], "%c", &c) == 1)
+        if (sscanf(argv[1], "%c", &c) != 1 || c < '1' || c > '3')
         {
-            switch (c)
-            {
-            case 'f':
-                cameras[0]->ConTakePhoto();
-                return 0;
-            case 'm':
-                cameras[2]->ConTakePhoto();
-                return 0;
-            case 'b':
-                cameras[1]->ConTakePhoto();
-                return 0;
-            }
+            return -1;
         }
     }
-    return -1;
+    if (argc == 2)
+    {
+        cameras[c - '1']->ConTakePhoto();
+    }
+    else if (argc == 3)
+    {
+        int x;
+        if (sscanf(argv[2], "%d", &x) != 1)
+        {
+            return -1;
+        }
+        cameras[c - '1']->vdebug = x;
+    }
+    return 0;
 }
 
 int DebugConsole::Cmd_stkr(int argc, char *argv[])

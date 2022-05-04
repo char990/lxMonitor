@@ -59,6 +59,9 @@ void UciSettings::LoadConfig()
 		{
 			c.distance.at(i) = ibuf[i];
 		}
+		c.vstopDelay = GetInt(uciSec, _VstopDelay, 1000, 5000, true);
+		c.vstopSpeed = GetInt(uciSec, _VstopSpeed, 5, 50, true);
+		
 		const char *isys = GetStr(uciSec, _iSys);
 		const char *stalker = GetStr(uciSec, _Stalker);
 		// isys
@@ -74,6 +77,7 @@ void UciSettings::LoadConfig()
 		c.iSys.minRange = GetInt(uciSec, _MinRange, 1, 5000, true);
 		c.iSys.minSignal = GetInt(uciSec, _MinSignal, 1, 99, true);
 		c.iSys.minSpeed = GetInt(uciSec, _MinSpeed, 1, 99, true);
+		c.iSys.maxSpeed = GetInt(uciSec, _MaxSpeed, c.iSys.minSpeed+1, 255, true);
 		c.iSys.cmErr = GetInt(uciSec, _CmErr, 1, 5000, true);
 
 		// stalker
@@ -130,6 +134,8 @@ void UciSettings::Dump()
 			len += sprintf(buf + len, (i == 0) ? "%d" : ",%d", c.distance[i]);
 		}
 		printf("\t%s \t'%s'\n", _Distance, buf);
+		PrintOption_d(_VstopDelay, c.vstopDelay);
+		PrintOption_d(_VstopSpeed, c.vstopSpeed);
 
 		PrintRadar(c.iSys);
 		PrintRadar(c.stalker);
@@ -169,6 +175,10 @@ void UciSettings::PrintRadar(UciRadar &radar)
 	if (radar.minSpeed >= 0)
 	{
 		PrintOption_d(_MinSpeed, radar.minSpeed);
+	}
+	if (radar.maxSpeed >= 0)
+	{
+		PrintOption_d(_MaxSpeed, radar.maxSpeed);
 	}
 	if (radar.minSignal >= 0)
 	{

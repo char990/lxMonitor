@@ -6,7 +6,7 @@
 class BootTimer
 {
 public:
-    BootTimer(){};
+    BootTimer(){Clear();};
     BootTimer(long ms) { Setms(ms); };
 
     /// \brief		Set timer in ms (1/1000 second)
@@ -26,10 +26,10 @@ public:
     /// \brief      Check if timer is clear(unuse)
     bool IsClear()
     {
-        return ns == 0 && sec == LONG_MAX;
+        return ns == 1000000 && sec == LONG_MAX;
     }
 
 private:
-    time_t sec{LONG_MAX};
-    __syscall_slong_t ns{0};
+    time_t sec;
+    __syscall_slong_t ns;
 };

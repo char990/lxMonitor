@@ -4,8 +4,6 @@
 
 Camera *cameras[3];
 
-const char XCAM[] = {'F', 'B', 'M'};
-
 Camera::Camera(int id)
     : id(id)
 {
@@ -20,6 +18,26 @@ Camera::~Camera()
 void Camera::PeriodicRun()
 {
     alarm->PeriodicRun();
+    if (vdebug)
+    {
+        if (alarm->HasEdge())
+        {
+            if ((alarm->IsHigh() && alarm_dbg != 1) || (alarm->IsLow() && alarm_dbg != 0))
+            {
+                alarm_dbg = alarm->IsHigh() ? 1 : 0;
+                PrintDbg(DBG_PRT, "camera[%d]-alarm[%d]", id, alarm_dbg);
+            }
+        }
+    }
+
+    if (id == 3)
+    {
+        // TODO: for Mcam only
+        if (alarm->HasEdge())
+        {
+            alarm->ClearEdge();
+        }
+    }
     TaskTakePhoto(&taskTakePhotoLine);
 }
 
@@ -35,13 +53,13 @@ bool Camera::TaskTakePhoto(int *_ptLine)
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
         takephoto->SetPinHigh();
         tmrTakePhoto.Setms(1000 - TAKINGPHOTO_TIME - 1);
+        toTakePhoto = false;
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
         if (conTakePhoto)
         {
-            PrintDbg(DBG_PRT, "%cCAM-shot", XCAM[id - 1]);
+            PrintDbg(DBG_PRT, "cam[%d]-shot", id);
             conTakePhoto = false;
         }
-        toTakePhoto = false;
     };
     PT_END();
 }

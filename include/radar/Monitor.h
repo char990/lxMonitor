@@ -23,9 +23,11 @@ private:
     int id;
     UciMonitor &uciMonitor;
     Radar::iSys::iSys400x *isys400x;
+    BootTimer tmrVstopDly;
     Radar::Stalker::StalkerStat *stalker;
     Camera *camera;
     Camera *cameraM;
+    int vspeed{0};
 };
 
 extern Monitor * monitors[2];

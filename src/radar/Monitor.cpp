@@ -13,6 +13,7 @@ Monitor::Monitor(int id, Camera *camera, Camera *cameraM)
 {
     stalker = new Stalker::StalkerStat(uciMonitor.stalker);
     isys400x = new iSys::iSys400x(uciMonitor.iSys, uciMonitor.distance);
+    tmrVstopDly.Clear();
 }
 
 Monitor::~Monitor()
@@ -48,8 +49,9 @@ void Monitor::PeriodicRun()
     {
         isys400x->SetStatus(RadarStatus::READY);
         // check distance
-        int r = isys400x->CheckRange();
-        if (r == 0)
+        int vs;
+        int r = isys400x->CheckRange(vs);
+        if (r == -1)
         {
             isys400x->SaveTarget(nullptr);
         }
@@ -60,15 +62,51 @@ void Monitor::PeriodicRun()
             {
                 PrintDbg(DBG_PRT, "ISYS[%d] takes photo", id);
             }
-            if (r == 1)
-            {
-                isys400x->SaveTarget(PHOTO_TAKEN);
-            }
-            else if (r == 2)
+            if (r == uciMonitor.distance.size())
             {
                 isys400x->SaveTarget(nullptr);
                 isys400x->SaveMeta(PHOTO_TAKEN, "Based on speculation");
             }
+            else
+            {
+                isys400x->SaveTarget(PHOTO_TAKEN);
+            }
+            if (r >= uciMonitor.distance.size() - 1)
+            {
+                tmrVstopDly.Setms(uciMonitor.vstopDelay);
+                vspeed = vs;
+                if (isys400x->Vdebug() >= 1)
+                {
+                    PrintDbg(DBG_PRT, "[%d] tmrVstopDly reload, vspeed=%d", id, vspeed);
+                }
+            }
+        }
+    }
+    if (camera->alarm->IsFalling())
+    {
+        tmrVstopDly.Clear();
+        camera->alarm->ClearEdge();
+        vspeed = 0;
+        if (isys400x->Vdebug() >= 1)
+        {
+            PrintDbg(DBG_PRT, "cam[%d]:Leaving", camera->Id());
+        }
+    }
+    else
+    {
+        if (!tmrVstopDly.IsClear() && tmrVstopDly.IsExpired())
+        {
+            if (vspeed > 0 && vspeed <= uciMonitor.vstopSpeed)
+            {
+                // vehicle stops
+                isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle stops");
+                if (isys400x->Vdebug() >= 1)
+                {
+                    PrintDbg(DBG_PRT, "cam[%d]:Vehicle stops", camera->Id());
+                }
+            }
+            tmrVstopDly.Clear();
+            vspeed = 0;
         }
     }
 
@@ -76,9 +114,9 @@ void Monitor::PeriodicRun()
     // cameraM
     if (cameraM != nullptr)
     {
-        auto c3 = cameraM->Alarm();
-        if (c3->IsHigh())
+        if (cameraM->alarm->IsFalling())
         {
+            camera->alarm->ClearEdge();
         }
     }
 }

@@ -81,7 +81,7 @@ void Log(int len)
 		Exec::Shell("rm %s/log/*_%02d > /dev/null 2>&1", mainpath, d);
 	}
 	days = today;
-	int log_fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+	int log_fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (log_fd < 0)
 	{
 		throw std::runtime_error(FmtException("Open log file failed:%s", filename));
