@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
         // monitor
         monitors[0] = new Monitor(1, cameras[0], cameras[1]);
         tmrEvt10ms->Add(monitors[0]);
-        monitors[1] = new Monitor(2, cameras[2], nullptr);
+        monitors[1] = new Monitor(2, cameras[2], cameras[2]);
         tmrEvt10ms->Add(monitors[1]);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");

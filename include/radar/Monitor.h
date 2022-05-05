@@ -10,7 +10,7 @@
 class Monitor : public IPeriodicRun
 {
 public:
-    Monitor(int id, Camera *camera, Camera *cameraM); // id is 1/2
+    Monitor(int id, Camera *cam, Camera *camPs); // id is 1/2
     ~Monitor();
 
     void StalkerDebug(int v) { stalker->Vdebug(v); };
@@ -25,8 +25,8 @@ private:
     Radar::iSys::iSys400x *isys400x;
     BootTimer tmrVstopDly;
     Radar::Stalker::StalkerStat *stalker;
-    Camera *camera;
-    Camera *cameraM;
+    Camera *cam;    // camera for range capture
+    Camera *camPs;  // camera for vehicle pass/stop
     int vspeed{0};
 };
 

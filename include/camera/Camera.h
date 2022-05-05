@@ -19,7 +19,7 @@ public:
 
     GpioIn *alarm;
     int vdebug{0};
-    int alarm_dbg{-1};
+    bool alarm_dbg{false};
 
     int Id(){return id;};
 private:

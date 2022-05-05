@@ -689,7 +689,7 @@ int iSys400x::CheckRange(int & speed)
 			{
 				v1st.vk.usec = usec;
 				v1st.vk.range -= RangeCM_sp_us(v1st.vk.speed, us);
-				if (Vdebug() >= 2)
+				if (Vdebug() >= 3)
 				{
 					char buf[128];
 					v1st.vk.Print(buf);
@@ -785,7 +785,7 @@ int iSys400x::CheckRange(int & speed)
 			speed = v1st.vk.speed;
 			if (Vdebug() >= 2)
 			{
-				PrintDbg(DBG_PRT, "\tphoto = [1]:uciRangeIndex=[%d]", v1st.uciRangeIndex);
+				PrintDbg(DBG_PRT, "\tphoto = [1]:uciRangeIndex=[%d],range=%d", v1st.uciRangeIndex, v1st.vk.range);
 			}
 			while (v1st.uciRangeIndex < distance.size() && v1st.vk.range <= distance[v1st.uciRangeIndex])
 			{
@@ -807,7 +807,7 @@ int iSys400x::CheckRange(int & speed)
 				speed = v2nd.vk.speed;
 				if (Vdebug() >= 2)
 				{
-					PrintDbg(DBG_PRT, "\tphoto = [2]:uciRangeIndex=[%d]", v2nd.uciRangeIndex);
+					PrintDbg(DBG_PRT, "\tphoto = [2]:uciRangeIndex=[%d],range=%d", v2nd.uciRangeIndex,v2nd.vk.range);
 				}
 				while (v2nd.uciRangeIndex < distance.size() && v2nd.vk.range <= distance[v2nd.uciRangeIndex])
 				{
