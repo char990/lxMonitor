@@ -10,14 +10,6 @@ using namespace Utils;
 
 #define DISTANCE_NUMBER 8
 
-UciSettings::UciSettings()
-{
-}
-
-UciSettings::~UciSettings()
-{
-}
-
 void UciSettings::LoadConfig()
 {
 	PrintDbg(DBG_LOG, ">>> Loading 'UciSettings'");
@@ -60,7 +52,8 @@ void UciSettings::LoadConfig()
 			c.distance.at(i) = ibuf[i];
 		}
 		c.vstopDelay = GetInt(uciSec, _VstopDelay, 1000, 5000, true);
-		c.vstopSpeed = GetInt(uciSec, _VstopSpeed, 5, 50, true);
+		c.camRange = GetInt(uciSec, _CamRange, 1, 3, true);
+		c.camVstop = GetInt(uciSec, _CamVstop, 1, 3, true);
 		
 		const char *isys = GetStr(uciSec, _iSys);
 		const char *stalker = GetStr(uciSec, _Stalker);
@@ -134,6 +127,8 @@ void UciSettings::Dump()
 			len += sprintf(buf + len, (i == 0) ? "%d" : ",%d", c.distance[i]);
 		}
 		printf("\t%s \t'%s'\n", _Distance, buf);
+		PrintOption_d(_CamRange, c.camRange);
+		PrintOption_d(_CamVstop, c.camVstop);
 		PrintOption_d(_VstopDelay, c.vstopDelay);
 		PrintOption_d(_VstopSpeed, c.vstopSpeed);
 

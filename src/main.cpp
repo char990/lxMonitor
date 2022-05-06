@@ -24,7 +24,6 @@
 
 #include <module/DebugConsole.h>
 
-#include <controller/Controller.h>
 #include <radar/Monitor.h>
 #include <radar/iSys.h>
 #include <fsworker/SpaceGC.h>
@@ -116,28 +115,6 @@ void GpioInit()
     Utils::Time::SleepMs(1000);                    // must sleep 1 second to GpioOut stable
 }
 
-#if 0
-
-#include <sys/statvfs.h>
-#include <stdio.h>
-
-main() {
-  int fd;
-  struct statvfs buf;
-
-  if (statvfs("/mnt/.", &buf) == -1)
-    perror("statvfs() error");
-  else {
-    printf("each block is %d bytes big\n", fs,
-           buf.f_bsize);
-    printf("there are %d blocks available out of a total of %d\n",
-           buf.f_bavail, buf.f_blocks);
-    printf("in bytes, that's %.0f bytes free out of a total of %.0f\n"
-           ((double)buf.f_bavail * buf.f_bsize),
-           ((double)buf.f_blocks * buf.f_bsize));
-  }
-}
-#endif
 #include <3rdparty/catch2/EnableTest.h>
 #if _ENABLE_TEST_ == 1
 #define CATCH_CONFIG_MAIN
@@ -185,10 +162,6 @@ int main(int argc, char *argv[])
             tmrEvt10ms->Add(pInput[i]);
         }
 
-        // Controller
-        //auto controller = new Controller();
-        //tmrEvt1000ms->Add(controller);
-
         // Camera3
         for(int i=0;i<3;i++)
         {
@@ -200,9 +173,9 @@ int main(int argc, char *argv[])
         tmrEvt100ms->Add(iSys400xPwr);
 
         // monitor
-        monitors[0] = new Monitor(1, cameras[0], cameras[1]);
+        monitors[0] = new Monitor(1, cameras);
         tmrEvt10ms->Add(monitors[0]);
-        monitors[1] = new Monitor(2, cameras[2], cameras[2]);
+        monitors[1] = new Monitor(2, cameras);
         tmrEvt10ms->Add(monitors[1]);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");

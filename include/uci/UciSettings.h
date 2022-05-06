@@ -42,13 +42,15 @@ public:
     std::vector<int> distance;
     int vstopDelay;
     int vstopSpeed;
+    int camRange;
+    int camVstop;
 };
 
 class UciSettings : public UciCfg
 {
 public:
-    UciSettings();
-    ~UciSettings();
+    UciSettings(){};
+    ~UciSettings(){};
 
     void LoadConfig() override;
 
@@ -78,6 +80,9 @@ private:
     const char *_Distance = "Distance";
     const char *_VstopDelay = "VstopDelay";
     const char *_VstopSpeed = "VstopSpeed";
+    const char *_CamRange = "CamRange";
+    const char *_CamVstop = "CamVstop";
+    
     // Radar    
     const char *_RadarPort = "RadarPort";
     const char *_RadarBps = "RadarBps";

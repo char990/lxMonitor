@@ -23,7 +23,7 @@ void Camera::PeriodicRun()
         if (alarm->IsHigh() != alarm_dbg)
         {
             alarm_dbg = alarm->IsHigh();
-            PrintDbg(DBG_PRT, "cam[%d]-alarm[%d]", id, alarm_dbg);
+            PrintDbg(DBG_PRT, "camRange[%d]-alarm[%d]", id, alarm_dbg);
         }
     }
 
@@ -46,7 +46,7 @@ bool Camera::TaskTakePhoto(int *_ptLine)
         toTakePhoto = false;
         if (conTakePhoto)
         {
-            PrintDbg(DBG_PRT, "cam[%d]-shot", id);
+            PrintDbg(DBG_PRT, "camRange[%d]-shot", id);
             conTakePhoto = false;
         }
     };

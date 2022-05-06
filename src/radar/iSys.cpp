@@ -369,26 +369,6 @@ iSys400x::~iSys400x()
 void iSys400x::SendSd2(const uint8_t *p, int len)
 {
 	uint8_t *buf = new uint8_t[6 + len + 2];
-#if 0
-		// this piece of code makes system reboot
-		buf[0] = ISYS_FRM_CTRL_SD2;
-		buf[1] = len + 2;
-		buf[2] = len + 2;
-		buf[3] = ISYS_FRM_CTRL_SD2;
-		buf[4] = ISYS_SLAVE_ADDR;
-		buf[5] = ISYS_MASTER_ADDR;
-		oprSp->Tx(buf, 6);
-		oprSp->Tx(p, len);
-		char c = buf[4] + buf[5];
-		for (int i = 0; i < len; i++)
-		{
-			c += *p;
-			p++;
-		}
-		buf[0] = c;
-		buf[1] = ISYS_FRM_CTRL_ED;
-		oprSp->Tx(buf, 2);
-#else
 	buf[0] = ISYS_FRM_CTRL_SD2;
 	buf[1] = len + 2;
 	buf[2] = len + 2;
@@ -405,7 +385,6 @@ void iSys400x::SendSd2(const uint8_t *p, int len)
 	buf[len + 6] = c;
 	buf[len + 7] = ISYS_FRM_CTRL_ED;
 	oprSp->Tx(buf, 6 + len + 2);
-#endif
 	delete[] buf;
 }
 
@@ -817,77 +796,6 @@ int iSys400x::CheckRange(int & speed)
 		}
 	}
 
-#if 0
-	if (!speculation)
-	{ // v1st must be valid, so only check v1st
-		if (targetlist.IsClosing())
-		{
-			v1stClosing = true;
-		}
-		if (v1stClosing)
-		{
-			if (uciRangeIndex < distance.size())
-			{
-				if(uciRangeIndex == 0 && v1st.range < distance.back())
-				{
-					return 0;	// expect a vehicle at far, ignore this
-				}
-				if (v1st.range <= distance[uciRangeIndex])
-				{
-					photo = 1;
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tphoto = 1[2], uciRangeIndex=%d", uciRangeIndex);
-					}
-					while (uciRangeIndex < distance.size() && v1st.range <= distance[uciRangeIndex])
-					{
-						uciRangeIndex++;
-					};
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tuciRangeIndex=%d", uciRangeIndex);
-					}
-				}
-				else if (0) // Vdebug() >= 2)
-				{
-					PrintDbg(DBG_PRT, "\tFALSE 1: uciRangeIndex=%d, v1st.range=%d", uciRangeIndex, v1st.range);
-				}
-			}
-		}
-	}
-	else
-	{ // speculation is running & check v2nd as well
-		if (v2nd.IsValid())
-		{
-			if (targetlist.IsClosing())
-			{
-				v2ndClosing = true;
-			}
-			if (v2ndClosing)
-			{
-				if (uciRangeIndex < distance.size())
-				{
-					if (v2nd.range <= distance[uciRangeIndex])
-					{
-						photo = 1;
-						if (Vdebug() >= 2)
-						{
-							PrintDbg(DBG_PRT, "\tphoto = 1[3]");
-						}
-						while (uciRangeIndex < distance.size() && v2nd.range <= distance[uciRangeIndex])
-						{
-							uciRangeIndex++;
-						};
-					}
-					else if (0) // Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tFALSE 2: uciRangeIndex=%d, v2nd.range=%d", uciRangeIndex, v2nd.range);
-					}
-				}
-			}
-		}
-	}
-#endif
 	if (photo == 1)
 	{
 		photo = speculation ? distance.size() : v1st.uciRangeIndex-1;

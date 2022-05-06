@@ -8,12 +8,13 @@ using namespace Radar;
 
 Monitor *monitors[2];
 
-Monitor::Monitor(int id, Camera *cam, Camera *camPs)
-    : id(id), cam(cam), camPs(camPs), uciMonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1])
+Monitor::Monitor(int id, Camera **cams)
+    : id(id), uciMonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1])
 {
     stalker = new Stalker::StalkerStat(uciMonitor.stalker);
     isys400x = new iSys::iSys400x(uciMonitor.iSys, uciMonitor.distance);
-    tmrVstopDly.Clear();
+    camRange = cams[uciMonitor.camRange-1];
+    camVstop = cams[uciMonitor.camVstop-1];
 }
 
 Monitor::~Monitor()
@@ -35,7 +36,7 @@ void Monitor::PeriodicRun()
         if (stalker->NewVehicle())
         {
             stalker->NewVehicle(false);
-            cam->TakePhoto();
+            camRange->TakePhoto();
             if (stalker->Vdebug() >= 1)
             {
                 PrintDbg(DBG_PRT, "STKR[%d] takes photo", id);
@@ -57,7 +58,7 @@ void Monitor::PeriodicRun()
         }
         else
         {
-            cam->TakePhoto();
+            camRange->TakePhoto();
             if (isys400x->Vdebug() >= 1)
             {
                 PrintDbg(DBG_PRT, "ISYS[%d] takes photo", id);
@@ -83,16 +84,16 @@ void Monitor::PeriodicRun()
         }
     }
     // check if vehicle is crossing line or stops 
-    if (camPs->alarm->IsFalling())
+    if (camVstop->alarm->IsFalling())
     {
         tmrVstopDly.Clear();
-        camPs->alarm->ClearEdge();
+        camVstop->alarm->ClearEdge();
         vspeed = 0;
-        camPs->TakePhoto();
+        camVstop->TakePhoto();
         isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle passed");
         if (isys400x->Vdebug() >= 1)
         {
-            PrintDbg(DBG_PRT, "cam[%d]:Passed", camPs->Id());
+            PrintDbg(DBG_PRT, "cam[%d]:Passed", camVstop->Id());
         }
     }
     else
@@ -102,11 +103,11 @@ void Monitor::PeriodicRun()
             if (vspeed > 0 && vspeed <= uciMonitor.vstopSpeed)
             {
                 // vehicle stops
-                camPs->TakePhoto();
+                camVstop->TakePhoto();
                 isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle stops");
                 if (isys400x->Vdebug() >= 1)
                 {
-                    PrintDbg(DBG_PRT, "cam[%d]:Vehicle stops", camPs->Id());
+                    PrintDbg(DBG_PRT, "cam[%d]:Vehicle stops", camVstop->Id());
                 }
             }
             tmrVstopDly.Clear();
