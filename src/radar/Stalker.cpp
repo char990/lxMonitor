@@ -17,7 +17,7 @@ void DBG1::Init(const char *dbg1)
     int s = sscanf(dbg1, "T%d %d %c%d %c%d %c%d %d %d",
                    &number, &id, &lastDir, &lastSp, &pkDir, &pkSp, &avgDir, &avgSp, &strength, &duration);
     if (s != 10 || number > 99 || id > 9999 ||
-        (DIRX != '?' && (lastDir != DIRX || pkDir != DIRX || avgDir != DIRX)) ||
+        (lastDir != pkDir || pkDir != avgDir || (lastDir != 'C' /*&& avgDir != 'A'*/)) ||
         lastSp > 999 || pkSp > 999 || avgSp > 999 ||
         strength > 99 || duration > 9999)
     {
@@ -49,7 +49,7 @@ void LOG::Init(const char *log)
                    &duration, &duration, &duration, &duration, &duration, &duration,
                    &dir, &c, &c, &c, &lastSp, &pkSp, &avgSp, &strength, &classification, &duration);
     if (s != 17 || id > 9999 ||
-        (DIRX != '?' && dir != DIRX) ||
+        (dir != 'C' && dir != 'A') ||
         lastSp > 999 || pkSp > 999 || avgSp > 999 ||
         strength > 99 || duration > 9999)
     {
@@ -127,7 +127,7 @@ int VehicleList::PushDgb1(const char *dbg1)
                 newVehicle = true;
                 if (vdebug >= 2)
                 {
-                    PrintDbg(DBG_PRT, "New Vehicle:ID=%04d", d->id);
+                    PrintDbg(DBG_PRT, "New %s:ID=%04d", (d->lastDir == 'A') ? "AWAY" : "CLOS", d->id);
                 }
                 if (vdebug >= 3)
                 {

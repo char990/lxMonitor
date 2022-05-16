@@ -35,6 +35,23 @@ void UciSettings::LoadConfig()
 	uciCloud.port = GetInt(uciSec, _Port, 1024, 65535, true);
 	uciCloud.site = std::string(GetStr(uciSec, _Site, true));
 
+	// train
+	SECTION = _Train;
+	uciSec = GetSection(SECTION);
+	uciTrain.monitor = GetInt(uciSec, _Monitor, 1, 2, true);
+	{// range
+		str = GetStr(uciSec, _Range);
+		int ibuf[2];
+		int cnt = Cnvt::GetIntArray(str, 2, ibuf, 1, 15000);
+		if (cnt != 2 || ibuf[0] >= ibuf[1])
+		{
+			throw std::invalid_argument(FmtException("Train.Range error"));
+		}
+		for (int i = 0; i < cnt; i++)
+		{
+			uciTrain.range[i] = ibuf[i];
+		}
+	}
 	// monitor%d
 	SECTION = sectionBuf;
 	for (int i = 0; i < 2; i++)
@@ -54,12 +71,13 @@ void UciSettings::LoadConfig()
 		c.vstopDelay = GetInt(uciSec, _VstopDelay, 1000, 5000, true);
 		c.camRange = GetInt(uciSec, _CamRange, 1, 3, true);
 		c.camVstop = GetInt(uciSec, _CamVstop, 1, 3, true);
-		
-		const char *isys = GetStr(uciSec, _iSys);
-		const char *stalker = GetStr(uciSec, _Stalker);
+
+		int isys = GetInt(uciSec, _iSys, 1, 2, true);
+		int stalker = GetInt(uciSec, _Stalker, 1, 2, true);
 		// isys
-		uciSec = GetSection(isys);
-		c.iSys.name = std::string(isys);
+		sprintf(sectionBuf, "%s%d", _iSys, isys);
+		c.iSys.name = std::string(sectionBuf);
+		uciSec = GetSection(sectionBuf);
 		c.iSys.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, COMPORT_SIZE);
 		c.iSys.radarBps = GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true);
 		c.iSys.radarId = GetInt(uciSec, _RadarId, 2, 255, true); // 0 & 1 not allowed
@@ -70,12 +88,14 @@ void UciSettings::LoadConfig()
 		c.iSys.minRange = GetInt(uciSec, _MinRange, 1, 5000, true);
 		c.iSys.minSignal = GetInt(uciSec, _MinSignal, 1, 99, true);
 		c.iSys.minSpeed = GetInt(uciSec, _MinSpeed, 1, 99, true);
-		c.iSys.maxSpeed = GetInt(uciSec, _MaxSpeed, c.iSys.minSpeed+1, 255, true);
+		c.iSys.maxSpeed = GetInt(uciSec, _MaxSpeed, c.iSys.minSpeed + 1, 255, true);
 		c.iSys.cmErr = GetInt(uciSec, _CmErr, 1, 5000, true);
 
 		// stalker
-		uciSec = GetSection(stalker);
-		c.stalker.name = std::string(stalker);
+		sprintf(sectionBuf, "%s%d", _Stalker, stalker);
+		c.stalker.name = std::string(sectionBuf);
+		uciSec = GetSection(sectionBuf);
+		c.stalker.name = std::string(sectionBuf);
 		c.stalker.radarPort = GetIndexFromStrz(uciSec, _RadarPort, COM_NAME, COMPORT_SIZE);
 		c.stalker.radarBps = GetInt(uciSec, _RadarBps, ALLOWEDBPS, STANDARDBPS_SIZE, true);
 	}
@@ -114,6 +134,10 @@ void UciSettings::Dump()
 	PrintOption_str(_Ip, uciCloud.ip.c_str());
 	PrintOption_d(_Port, uciCloud.port);
 	PrintOption_str(_Site, uciCloud.site.c_str());
+
+	printf("%s:\n", _Train);
+	PrintOption_d(_Monitor, uciTrain.monitor);
+	printf("\t%s \t'%d, %d'\n", _Range, uciTrain.range[0], uciTrain.range[1]);
 
 	for (int i = 0; i < 2; i++)
 	{

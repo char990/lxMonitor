@@ -149,7 +149,7 @@ namespace Radar
                 vk.Reset();
             }
             bool IsValid() { return vk.IsValid(); }
-            void Loadvk(Vehicle * v)
+            void Loadvk(Vehicle *v)
             {
                 memcpy(&vk, v, sizeof(Vehicle));
             }
@@ -158,7 +158,7 @@ namespace Radar
         class iSys400x : public IRadar
         {
         public:
-            iSys400x(UciRadar &uciradar, std::vector<int> &distance);
+            iSys400x(int channel, UciRadar &uciradar, std::vector<int> &distance);
             virtual ~iSys400x();
 
             virtual int RxCallback(uint8_t *buf, int len) override { return 0; }; // No RxCallback for iSYS
@@ -174,9 +174,10 @@ namespace Radar
             TargetList targetlist;
 
             /// \return -1:Normal; 0~disatance.size()-1:Take photo by setting; disatance.size():Take photo by speculation
-            int CheckRange(int & speed);
+            int CheckRange(int &speed);
 
         protected:
+            int channel;
             std::vector<int> &distance;
 
 #define MAX_PACKET_SIZE (9 + MAX_TARGETS * 7 + 1)
@@ -186,10 +187,17 @@ namespace Radar
             void CmdReadDeviceName();
             void CmdStartAcquisition();
             void CmdStopAcquisition();
+            void CmdReadFreqChannel();
+            void CmdSetFreqChannel();
             void CmdReadTargetList();
-            bool VerifyCmdAck();
+            void CmdReadAppSetting(uint8_t index);
+            void CmdWriteAppSetting(uint8_t index, int16_t data);
+            void CmdSaveToEEprom();
+
+            bool VerifyCmdAck(uint8_t cmd);
             iSYS_Status ChkRxFrame(uint8_t *packet, int packetLen);
             int DecodeDeviceName();
+            int DecodeFreqChannel();
 
             /// \brief Read packet. If there are more than one packet in buf, only keep the last packet
             /// \return packet length

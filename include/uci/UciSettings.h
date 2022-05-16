@@ -24,6 +24,7 @@ public:
     int radarId{-1};    // -1 means may not be used
     int radarMode{-1};
     int radarCode{-1};
+    int channel{-1};
     int rangeLast{-1};
     int rangeRise{-1};
     int minRange{-1};
@@ -46,6 +47,13 @@ public:
     int camVstop;
 };
 
+class UciTrian
+{
+public:
+    int monitor;
+    int range[2];
+};
+
 class UciSettings : public UciCfg
 {
 public:
@@ -58,6 +66,7 @@ public:
 
     UciCloud uciCloud;
     UciMonitor uciMonitor[2];
+    UciTrian uciTrain;
 
     unsigned int FreeGiga() { return freeGiga;};
 
@@ -73,6 +82,10 @@ private:
     const char *_Ip = "Ip";
     const char *_Port = "Port";
     const char *_Site = "Site";
+
+    const char *_Train = "Train";           // section
+    //const char *_Monitor = "Monitor";
+    const char *_Range = "Range";
 
     const char *_Monitor = "Monitor";       // section
     const char *_iSys = "iSys";

@@ -21,10 +21,13 @@ public:
 
 private:
     int id;
+    UciTrian &uciTrian;
     UciMonitor &uciMonitor;
     Radar::iSys::iSys400x *isys400x;
-    BootTimer tmrVstopDly;
     Radar::Stalker::StalkerStat *stalker;
+    BootTimer tmrVstopDly;
+    BootTimer tmrTrainDly;
+    bool isTrain{false};
     Camera *camRange;    // camera for range capture
     Camera *camVstop;  // camera for vehicle pass/stop
     int vspeed{0};

@@ -15,7 +15,6 @@ namespace Radar
 {
     namespace Stalker
     {
-#define DIRX 'C' // 'A':away / 'C':close / '?':unknown/both
         class DBG1
         {
         public:
@@ -24,7 +23,7 @@ namespace Radar
             timeval time;
             int number; // if number == 00, it means a new cycle
             int id{-1}; // if id == -1, it means this class is empty
-            char lastDir;
+            char lastDir; // 'A':away / 'C':close / '?':unknown/both
             int lastSp;
             char pkDir;
             int pkSp;

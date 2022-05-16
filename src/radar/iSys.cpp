@@ -94,12 +94,27 @@ SD3	DA	SA	FC	PDU	FCS	ED
 #define RADAR_CMD_START 0xd1
 #define RADAR_CMD_STOP 0xd1
 #define RADAR_CMD_RD_TGT_LIST 0xda
+#define RADAR_CMD_RD_FREQ_CHN 0xd2
+#define RADAR_CMD_SET_FREQ_CHN 0xd3
 #define RADAR_CMD_RD_APP_SETTING 0xd4
 #define RADAR_CMD_WR_APP_SETTING 0xd5
 #define RADAR_CMD_EEPROM 0xdf
 #define RADAR_CMD_FAILED 0xfd
 
-//#define RX_BUF_SIZE 4096
+// parameter setting code
+#define CODE_RANGE_MIN 0x08
+#define CODE_RANGE_MAX 0x09
+#define CODE_SIGNAL_MIN 0x0A
+#define CODE_SIGNAL_MAX 0x0B
+#define CODE_SPEED_MIN 0x0C
+#define CODE_SPEED_MAX 0x0D
+#define CODE_SPEED_DIR 0x0E
+#define CODE_FLT_SIGNAL 0x16
+#define APP_SETTING_SIZE 8
+
+const uint8_t APP_SETTING_LIST[APP_SETTING_SIZE] = {
+	CODE_RANGE_MIN, CODE_RANGE_MAX, CODE_SIGNAL_MIN, CODE_SIGNAL_MAX,
+	CODE_SPEED_MIN, CODE_SPEED_MAX, CODE_SPEED_DIR, CODE_FLT_SIGNAL};
 
 const uint8_t read_device_name[] = {
 	RADAR_CMD_RD_DEV_NAME
@@ -123,6 +138,18 @@ const uint8_t read_target_list_16bit[] = {
 	// 0xda read target list
 	// 1	Target list filtered with parameters from output 1
 	// 16	Output of sint16_t variable types (16-Bit output)
+};
+
+const uint8_t read_FreqChannel[] = {
+	RADAR_CMD_RD_FREQ_CHN, 0x00, 0x04
+	// 0xd2 command
+	// 0x00 0x04 FreqChannel
+};
+
+const uint8_t set_FreqChannel[] = {
+	RADAR_CMD_SET_FREQ_CHN, 0x00, 0x04
+	// 0xd3 command
+	// 0x00 0x04 FreqChannel
 };
 
 void VehicleFilter::PushVehicle(Vehicle *v)
@@ -352,8 +379,8 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	PT_END();
 }
 
-iSys400x::iSys400x(UciRadar &uciradar, std::vector<int> &distance)
-	: IRadar(uciradar), targetlist(uciradar), distance(distance)
+iSys400x::iSys400x(int channel, UciRadar &uciradar, std::vector<int> &distance)
+	: channel(channel), IRadar(uciradar), targetlist(uciradar), distance(distance)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::POWER_UP;
@@ -388,10 +415,36 @@ void iSys400x::SendSd2(const uint8_t *p, int len)
 	delete[] buf;
 }
 
-bool iSys400x::VerifyCmdAck()
+bool iSys400x::VerifyCmdAck(uint8_t cmd)
 {
 	auto len = ReadPacket();
-	return (len != 0 && packet[ISYS_FRM_FC] == RADAR_CMD_START);
+	return (len != 0 && packet[ISYS_FRM_FC] == cmd);
+}
+
+void iSys400x::CmdReadAppSetting(uint8_t index)
+{
+	uint8_t cmd[3];
+	cmd[0] = RADAR_CMD_RD_APP_SETTING;
+	cmd[1] = 0x01;
+	cmd[2] = APP_SETTING_LIST[index];
+	SendSd2(cmd, 3);
+}
+
+void iSys400x::CmdWriteAppSetting(uint8_t index, int16_t data)
+{
+	uint8_t cmd[5];
+	cmd[0] = RADAR_CMD_WR_APP_SETTING;
+	cmd[1] = 0x01;
+	cmd[2] = APP_SETTING_LIST[index];
+	cmd[3] = data / 0x100;
+	cmd[4] = data;
+	SendSd2(cmd, 5);
+}
+
+void iSys400x::CmdSaveToEEprom()
+{
+	uint8_t cmd[2] = {RADAR_CMD_EEPROM, 0x03};
+	SendSd2(cmd, 2);
 }
 
 int iSys400x::ReadPacket()
@@ -468,6 +521,33 @@ void iSys400x::CmdStartAcquisition()
 void iSys400x::CmdStopAcquisition()
 {
 	SendSd2(stop_acquisition, countof(stop_acquisition));
+}
+
+void iSys400x::CmdReadFreqChannel()
+{
+	SendSd2(read_FreqChannel, countof(read_FreqChannel));
+}
+
+void iSys400x::CmdSetFreqChannel()
+{
+	int len = countof(set_FreqChannel);
+	uint8_t *buf = new uint8_t[len + 2];
+	memcpy(buf, set_FreqChannel, len);
+	buf[len++] = 0;
+	buf[len++] = channel;
+	SendSd2(buf, len);
+	delete[] buf;
+}
+
+int iSys400x::DecodeFreqChannel()
+{
+	int c = -1;
+	if (VerifyCmdAck(RADAR_CMD_RD_FREQ_CHN))
+	{
+		c = packet[ISYS_FRM_PDU + 1];
+		PrintDbg(DBG_LOG, "%s:freq channel:%d", uciradar.name.c_str(), c);
+	}
+	return c;
 }
 
 void iSys400x::CmdReadTargetList()
@@ -574,24 +654,44 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			}
 		} while (radarStatus != RadarStatus::EVENT);
 		PT_YIELD();
-
-		// stop then start
+		// stop and set channel
+		radarStatus = RadarStatus::INITIALIZING;
+		do
+		{
+			CmdStopAcquisition();
+			tmrTaskRadar.Setms(100 - 1);
+			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+			CmdSetFreqChannel();
+			tmrTaskRadar.Setms(100 - 1);
+			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+			ClearRxBuf();
+			CmdReadFreqChannel();
+			tmrTaskRadar.Setms(100 - 1);
+			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+			if (DecodeFreqChannel() == channel)
+			{
+				radarStatus = RadarStatus::EVENT;
+				ssTimeout.Setms(ISYS_TIMEOUT);
+			}
+		} while (radarStatus != RadarStatus::EVENT);
+		PT_YIELD();
+		// start
 		radarStatus = RadarStatus::INITIALIZING;
 		do
 		{
 			CmdStartAcquisition();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			if (!VerifyCmdAck())
+			if (VerifyCmdAck(RADAR_CMD_START))
+			{
+				radarStatus = RadarStatus::EVENT;
+				ssTimeout.Setms(ISYS_TIMEOUT);
+			}
+			else
 			{
 				CmdStopAcquisition();
 				tmrTaskRadar.Setms(100 - 1);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			}
-			else
-			{
-				radarStatus = RadarStatus::EVENT;
-				ssTimeout.Setms(ISYS_TIMEOUT);
 			}
 		} while (radarStatus != RadarStatus::EVENT);
 		PT_YIELD();
@@ -649,12 +749,13 @@ int iSys400x::SaveMeta(const char *comment, const char *details)
 }
 
 #define NO_PHOTO -1
-int iSys400x::CheckRange(int & speed)
+int iSys400x::CheckRange(int &speed)
 {
 	int speculation = 0;
 	auto Speculate_v1st = [&]
 	{
-		if (v1st.IsValid() && v1st.isClosing && (v1st.uciRangeIndex < distance.size()) && !tmrSpeculation.IsExpired())
+		if (v1st.IsValid() && v1st.isClosing && v1st.vk.speed > 5 &&
+			(v1st.uciRangeIndex < distance.size()) && !tmrSpeculation.IsExpired())
 		{ // refresh v1st based on speculation
 			if (tmrSpeculation.IsClear())
 			{
@@ -786,7 +887,7 @@ int iSys400x::CheckRange(int & speed)
 				speed = v2nd.vk.speed;
 				if (Vdebug() >= 2)
 				{
-					PrintDbg(DBG_PRT, "\tphoto = [2]:uciRangeIndex=[%d],range=%d", v2nd.uciRangeIndex,v2nd.vk.range);
+					PrintDbg(DBG_PRT, "\tphoto = [2]:uciRangeIndex=[%d],range=%d", v2nd.uciRangeIndex, v2nd.vk.range);
 				}
 				while (v2nd.uciRangeIndex < distance.size() && v2nd.vk.range <= distance[v2nd.uciRangeIndex])
 				{
@@ -798,7 +899,7 @@ int iSys400x::CheckRange(int & speed)
 
 	if (photo == 1)
 	{
-		photo = speculation ? distance.size() : v1st.uciRangeIndex-1;
+		photo = speculation ? distance.size() : v1st.uciRangeIndex - 1;
 		if (speculation || v1st.uciRangeIndex == distance.size()) // only v1st && speculation
 		{
 			TaskRangeReset();
@@ -815,7 +916,7 @@ int iSys400x::CheckRange(int & speed)
 		v1st.Clone(v2nd);
 		v2nd.Reset();
 		tmrSpeculation.Clear();
-		photo = v2nd.uciRangeIndex-1;
+		photo = v2nd.uciRangeIndex - 1;
 	}
 	return photo;
 }
