@@ -31,6 +31,9 @@ namespace Radar
 #define MIN_SPEED 0
 #define MIN_RANGE 2
 
+#define RangeCM_sp_us(sp, us) (sp * us / 36000)
+#define Timeval2us(tv) ((int64_t)1000000 * tv.tv_sec + tv.tv_usec)
+
         class Vehicle
         {
         public: // only use 16-bit resolution
@@ -49,13 +52,14 @@ namespace Radar
         {
         public:
 #define VF_SIZE 2
+            VehicleFilter() {};
             VehicleFilter(int cmErr) : cmErr(cmErr)
             {
                 Reset();
             };
             void PushVehicle(Vehicle *v);
             Vehicle items[VF_SIZE + 1];
-            bool isClosing{false};
+            bool isCA{false};       // Closing or Away confirmed
             bool isSlowdown{false};
             int cmErr;
             void Reset();
@@ -69,7 +73,8 @@ namespace Radar
 
             int flag{0}; // return of DecodeTargetFrame
             int cnt{0};
-            std::vector<Vehicle> vehicles{MAX_TARGETS};
+            Vehicle vClos;
+            Vehicle vAway;
 
             /// \brief  decodes target list frame received from iSYS device - Note: only 16-bit.
             /// \return -1:Error; 0:NO target; 1-MAX:number of target
@@ -84,10 +89,8 @@ namespace Radar
             int Print(char *buf);
             int Print();
 
-            /// \brief refresh minRangeVehicle and run vehicle filter to see if this is closing vehicle
-            void Refresh();
             Vehicle *minRangeVehicle;
-            bool IsClosing() { return vfilter.isClosing; };
+            bool IsClosing() { return vfilter.isCA; };
             uint64_t GetPktTime() { return pktTime.tv_sec * 1000000 + pktTime.tv_usec; };
 
         private:
@@ -129,7 +132,7 @@ namespace Radar
         {
         public:
             Vehicle vk;
-            bool isClosing{false};
+            bool isCA{false};
             int uciRangeIndex{0};
             void Clone(Range *v)
             {
@@ -144,7 +147,7 @@ namespace Radar
             }
             void Reset()
             {
-                isClosing = false;
+                isCA = false;
                 uciRangeIndex = 0;
                 vk.Reset();
             }
@@ -155,31 +158,41 @@ namespace Radar
             }
         };
 
-        class iSys400x : public IRadar
+        class iSys400x : public IRadar, public IPeriodicRun
         {
         public:
-            iSys400x(int channel, UciRadar &uciradar, std::vector<int> &distance);
+            iSys400x(UciRadar &uciradar);
             virtual ~iSys400x();
 
             virtual int RxCallback(uint8_t *buf, int len) override { return 0; }; // No RxCallback for iSYS
+
+            virtual void PeriodicRun() override { TaskRadarPoll(); };
 
             bool TaskRadarPoll() override;
 
             void Reset();
 
+            Vehicle vClos; // closing vehicle: speed & range > 0
+            Vehicle vAway; // away vehicle: speed & range < 0
+
+            /// \brief  decodes target list frame received from iSYS device - Note: only 16-bit.
+            /// \return -1:Error; 0:NO target; 1:Closing; 2:Away; 3:Both
+            int DecodeTargetFrame(/*uint8_t *packet, int packetLen*/);
+
+#if 0
             int SaveTarget(const char *comment);
 
             int SaveMeta(const char *comment, const char *details);
 
-            TargetList targetlist;
-
             /// \return -1:Normal; 0~disatance.size()-1:Take photo by setting; disatance.size():Take photo by speculation
             int CheckRange(int &speed);
-
+#endif
         protected:
-            int channel;
-            std::vector<int> &distance;
-
+            // std::vector<int> &distance;
+            struct timeval pktTime
+            {
+                0, 0
+            };
 #define MAX_PACKET_SIZE (9 + MAX_TARGETS * 7 + 1)
             uint8_t packet[MAX_PACKET_SIZE];
             int packetLen;
@@ -212,14 +225,9 @@ namespace Radar
             int taskRadarPoll_{0};
             bool TaskRadarPoll_(int *_ptLine);
             void TaskRadarPoll_Reset();
-
-            /*********************TaskRange********************/
-            BootTimer tmrRange, tmrSpeculation;
-            Range v1st, v2nd;
-            void TaskRangeReset();
         };
-
     }
 }
 
-extern Radar::iSys::iSys400xPower *iSys400xPwr;
+extern Radar::iSys::iSys400xPower *isys400xpwr;
+extern Radar::iSys::iSys400x *isys400x[2];

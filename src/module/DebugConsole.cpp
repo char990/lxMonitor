@@ -7,7 +7,9 @@
 #include <module/Epoll.h>
 #include <camera/Camera.h>
 #include <radar/iSys.h>
-#include <radar/Monitor.h>
+#include <radar/Stalker.h>
+#include <controller/Monitor.h>
+
 
 const Command DebugConsole::CMD_LIST[] = {
     {"?",
@@ -23,7 +25,7 @@ const Command DebugConsole::CMD_LIST[] = {
      "Set websocket hexdump ON/OFF",
      DebugConsole::Cmd_ws},*/
     {"cam",
-     "Take photo by camera 1-. Usage: cam 1-3\n"
+     "Take photo by camera 1-3. Usage: cam 1-3\n"
      "\t| Set camera 1-3 debug. Usage: cam 1-3 X",
      DebugConsole::Cmd_cam},
     {"stkr",
@@ -33,6 +35,9 @@ const Command DebugConsole::CMD_LIST[] = {
      "iSys400x 1|2 debug info X. Usage: isys 1|2 X\n"
      "\t| iSys400x power on|off. Usage: isys on|off",
      DebugConsole::Cmd_isys},
+    {"monitor",
+     "monitor 1|2 debug info X. Usage: monitor 1|2 X",
+     DebugConsole::Cmd_monitor},
 };
 
 DebugConsole::DebugConsole()
@@ -200,7 +205,7 @@ int DebugConsole::Cmd_cam(int argc, char *argv[])
         {
             return -1;
         }
-        cameras[c - '1']->vdebug = x;
+        cameras[c - '1']->SetVdebug(x);
     }
     return 0;
 }
@@ -213,7 +218,7 @@ int DebugConsole::Cmd_stkr(int argc, char *argv[])
         int s = argv[2][0] - '0';
         if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
-            monitors[r]->StalkerDebug(s);
+            stalkerTSS2[r]->SetVdebug(s);
             return 0;
         }
     }
@@ -227,14 +232,14 @@ int DebugConsole::Cmd_isys(int argc, char *argv[])
         if (strcmp(argv[1], "on") == 0)
         {
             RelayNcOn();
-            iSys400xPwr->PwrOn();
+            isys400xpwr->PwrOn();
             printf("isys1&2 ON\n");
             return 0;
         }
         else if (strcmp(argv[1], "off") == 0)
         {
             RelayNcOff();
-            iSys400xPwr->ManualOff();
+            isys400xpwr->ManualOff();
             printf("isys1&2 OFF\n");
             return 0;
         }
@@ -245,7 +250,22 @@ int DebugConsole::Cmd_isys(int argc, char *argv[])
         int s = argv[2][0] - '0';
         if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
-            monitors[r]->iSysDebug(s);
+            isys400x[r]->SetVdebug(s);
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int DebugConsole::Cmd_monitor(int argc, char *argv[])
+{
+    if (argc == 3)
+    {
+        int r = argv[1][0] - '1';
+        int s = argv[2][0] - '0';
+        if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
+        {
+            monitors[r]->SetVdebug(s);
             return 0;
         }
     }

@@ -1,4 +1,4 @@
-#include <radar/Monitor.h>
+#include <controller/Controller.h>
 
 #include <uci/DbHelper.h>
 #include <module/ptcpp.h>
@@ -6,93 +6,36 @@
 
 using namespace Radar;
 
-Monitor *monitors[2];
-
-Monitor::Monitor(int id, Camera **cams)
-    : id(id),
-      uciMonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1]),
-      uciTrian(DbHelper::Instance().GetUciSettings().uciTrain)
+Controller::Controller()
 {
-    stalker = new Stalker::StalkerStat(uciMonitor.stalker);
-    isys400x = new iSys::iSys400x(id, uciMonitor.iSys, uciMonitor.distance);
-    camRange = cams[uciMonitor.camRange - 1];
-    camVstop = cams[uciMonitor.camVstop - 1];
+
 }
 
-Monitor::~Monitor()
+Controller::~Controller()
 {
-    delete stalker;
-    delete isys400x;
 }
 
-void Monitor::PeriodicRun()
+void Controller::PeriodicRun()
 {
-    RadarStatus st;
-    // ----------------- STALKER -----------------
-    stalker->TaskRadarPoll();
-    st = stalker->GetStatus();
-    if (st == RadarStatus::EVENT)
+    for (int i = 0; i < 2; i++)
     {
-        stalker->SetStatus(RadarStatus::READY);
-        // when there is a new vehicle in sight, take photo
-        if (stalker->NewVehicle())
-        {
-            stalker->NewVehicle(false);
-            camRange->TakePhoto();
-            if (stalker->Vdebug() >= 1)
-            {
-                PrintDbg(DBG_PRT, "STKR[%d] takes photo", id);
-            }
-        }
+        monitors[i]->Task();
     }
-    // ----------------- iSYS400x -----------------
-    isys400x->TaskRadarPoll();
-    st = isys400x->GetStatus();
-    if (st == RadarStatus::EVENT)
+
+    // over
+    for (int i = 0; i < 2; i++)
     {
-        isys400x->SetStatus(RadarStatus::READY);
-        if (uciTrian.monitor == id && isTrain)
+        if (stalkerTSS2[i]->GetStatus() == RadarStatus::EVENT)
         {
-            // If there is a train, garbage data
+            stalkerTSS2[i]->SetStatus(RadarStatus::READY);
         }
-        else
+        if (isys400x[i]->GetStatus() == RadarStatus::EVENT)
         {
-            // check distance
-            int vs;
-            int r = isys400x->CheckRange(vs);
-            if (r == -1)
-            {
-                isys400x->SaveTarget(nullptr);
-            }
-            else
-            {
-                camRange->TakePhoto();
-                if (isys400x->Vdebug() >= 1)
-                {
-                    PrintDbg(DBG_PRT, "ISYS[%d] takes photo", id);
-                }
-                if (r == uciMonitor.distance.size())
-                {
-                    isys400x->SaveTarget(nullptr);
-                    isys400x->SaveMeta(PHOTO_TAKEN, "Based on speculation");
-                }
-                else
-                {
-                    isys400x->SaveTarget(PHOTO_TAKEN);
-                }
-                if (r >= uciMonitor.distance.size() - 1)
-                {
-                    tmrVstopDly.Setms(uciMonitor.vstopDelay);
-                    vspeed = vs;
-                    if (isys400x->Vdebug() >= 1)
-                    {
-                        PrintDbg(DBG_PRT, "[%d] tmrVstopDly reload, vspeed=%d", id, vspeed);
-                    }
-                }
-            }
+            isys400x[i]->SetStatus(RadarStatus::READY);
         }
     }
 
+#if 0
     if (uciTrian.monitor == id) // TODO: check if there is a train
     {
         if (camVstop->alarm->IsFalling())
@@ -172,4 +115,5 @@ void Monitor::PeriodicRun()
             }
         }
     }
+#endif
 }

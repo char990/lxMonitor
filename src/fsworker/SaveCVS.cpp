@@ -29,6 +29,21 @@ SaveCSV::~SaveCSV()
     }
 }
 
+int SaveCSV::SaveRadarMeta(int64_t &us, const char *comment, const char *meta)
+{
+    struct timeval time;
+    time.tv_sec = us/0x100000000;
+    time.tv_usec = us%0x100000000;
+    return SaveRadarMeta(time, comment, meta);
+}
+
+int SaveCSV::SaveRadarMeta(const char *comment, const char *meta)
+{
+    struct timeval time;
+    gettimeofday(&time, nullptr);
+    return SaveRadarMeta(time, comment, meta);
+}
+
 int SaveCSV::SaveRadarMeta(struct timeval &time, const char *comment, const char *meta)
 {
     char tstring[32];

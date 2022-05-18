@@ -18,7 +18,7 @@ Camera::~Camera()
 void Camera::PeriodicRun()
 {
     alarm->PeriodicRun();
-    if (vdebug)
+    if (GetVdebug())
     {
         if (alarm->IsHigh() != alarm_dbg)
         {

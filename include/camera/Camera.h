@@ -4,8 +4,9 @@
 #include <gpio/GpioIn.h>
 #include <module/BootTimer.h>
 #include <module/IPeriodicRun.h>
+#include <module/Vdebug.h>
 
-class Camera : public IPeriodicRun
+class Camera : public IPeriodicRun, public Vdebug
 {
 public:
     Camera(int id); // id is 1/2/3
@@ -18,7 +19,6 @@ public:
     virtual void PeriodicRun() override;
 
     GpioIn *alarm;
-    int vdebug{0};
     bool alarm_dbg{false};
 
     int Id(){return id;};

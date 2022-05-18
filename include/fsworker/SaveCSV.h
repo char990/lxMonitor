@@ -13,6 +13,8 @@ public:
     ~SaveCSV();
 
     int SaveRadarMeta(struct timeval &time, const char *comment, const char *meta);
+    int SaveRadarMeta(int64_t &us, const char *comment, const char *meta);
+    int SaveRadarMeta(const char *comment, const char *meta);
 
 private:
     std::string filename;

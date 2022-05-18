@@ -11,6 +11,8 @@ using namespace Utils;
 
 #define STALKER_TIMEOUT_MS 2000
 
+Radar::Stalker::StalkerTSS2 * stalkerTSS2[2];
+
 /**************************DBG1*************************/
 void DBG1::Init(const char *dbg1)
 {
@@ -120,7 +122,7 @@ int VehicleList::PushDgb1(const char *dbg1)
             }
             if (!vehicle_exists)
             { // Not exist in list, new vehicle
-                SaveDBG1(dbg1, PHOTO_TAKEN);
+                SaveDBG1(dbg1, (stkrCapture>0)?PHOTO_TAKEN:nullptr);
                 auto newv = std::shared_ptr<Vehicle>(new Vehicle);
                 newv->dbg1list.push_back(d);
                 vlist.push_back(newv);
@@ -186,7 +188,7 @@ int VehicleList::SaveDBG1(const char *dbg1, const char *comment)
 }
 
 /**************************Radar*************************/
-StalkerStat::StalkerStat(UciRadar &uciradar)
+StalkerTSS2::StalkerTSS2(UciRadar &uciradar)
     : IRadar(uciradar), vehicleList(uciradar.name)
 {
     oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, this);
@@ -194,12 +196,12 @@ StalkerStat::StalkerStat(UciRadar &uciradar)
     ssTimeout.Setms(STALKER_TIMEOUT_MS);
 }
 
-StalkerStat::~StalkerStat()
+StalkerTSS2::~StalkerTSS2()
 {
     delete oprSp;
 }
 
-int StalkerStat::RxCallback(uint8_t *data, int len)
+int StalkerTSS2::RxCallback(uint8_t *data, int len)
 {
     uint8_t *p = data;
     for (int i = 0; i < len; i++)
@@ -220,7 +222,7 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
                 dbg1buf[dbg1len] = '\0';
                 if (vehicleList.PushDgb1((const char *)dbg1buf) >= 0)
                 {
-                    if (dbg1len != 0 && Vdebug() >= 3)
+                    if (dbg1len != 0 && GetVdebug() >= 3)
                     {
                         PrintDbg(DBG_PRT, "%s", dbg1buf);
                     }
@@ -244,12 +246,12 @@ int StalkerStat::RxCallback(uint8_t *data, int len)
     return 0;
 }
 
-bool StalkerStat::TaskRadarPoll()
+bool StalkerTSS2::TaskRadarPoll()
 {
     return true;
 }
 
-RadarStatus StalkerStat::GetStatus()
+RadarStatus StalkerTSS2::GetStatus()
 {
     if (ssTimeout.IsExpired())
     {
@@ -258,7 +260,7 @@ RadarStatus StalkerStat::GetStatus()
         vehicleList.PushDgb1((const char *)dbg1buf);
         radarStatus = RadarStatus::EVENT;
         ssTimeout.Clear();
-        if (Vdebug() >= 2)
+        if (GetVdebug() >= 2)
         {
             PrintDbg(DBG_PRT, "%s ssTimeout\n", uciradar.name.c_str());
         }

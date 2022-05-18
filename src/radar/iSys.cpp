@@ -15,18 +15,10 @@ using namespace Utils;
 using namespace Radar;
 using namespace Radar::iSys;
 
-iSys400xPower *iSys400xPwr;
-
-#define RangeCM_sp_us(sp, us) (sp * us / 36000)
-#define Timeval2us(tv) ((int64_t)1000000 * tv.tv_sec + tv.tv_usec)
+iSys400xPower *isys400xpwr;
+iSys400x *isys400x[2];
 
 #define ISYS_TIMEOUT (ISYS_PWR_0_T + ISYS_PWR_1_T + 1000)
-
-#define TMR_RANGE 3000
-#define TMR_SPECULATION 1000
-#if TMR_RANGE <= TMR_SPECULATION
-#error TMR_RANGE should greater than TMR_SPECULATION
-#endif
 
 /*****************************
 Radar is iSYS 4001
@@ -160,91 +152,48 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 	}
 	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
 	memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
-	isClosing = false;
+	isCA = false;
 	for (int i = 0; i < VF_SIZE; i++)
 	{
+		int speed = items[i].speed;
 		int usec = items[i + 1].usec - items[i].usec;
 		int cm = items[i + 1].range - items[i].range;
-		if (items[i].usec == 0 || usec <= 0 || usec > 500000 || cm > 0)
+		if (items[i].usec == 0 || usec <= 0 || usec > 500000 || (speed > 0 && cm > 0) || (speed < 0 && cm < 0))
 		{
 			return;
 		}
-		int r = RangeCM_sp_us(items[i].speed, usec);
+		if (speed < 0)
+		{
+			cm = -cm;
+			speed = -speed;
+		}
+		int r = RangeCM_sp_us(speed, usec);
 		cm = (cm > r) ? (cm - r) : (r - cm);
 		if (cm > cmErr)
 		{
 			return;
 		}
 	}
-	isClosing = true;
-	isSlowdown = items[0].speed > items[1].speed && items[1].speed > items[2].speed;
+	isCA = true;
 };
 
 void VehicleFilter::Reset()
 {
 	bzero(items, sizeof(items));
-	isClosing = false;
+	isCA = false;
 	isSlowdown = false;
 }
-
+#if 0
 void TargetList::Reset()
 {
 	flag = 0;
 	cnt = 0;
-	for (auto &v : vehicles)
+	for (auto &v : vClos)
 	{
 		v.Reset();
 	}
 	minRangeVehicle = nullptr;
 	vfilter.Reset();
-}
-
-int TargetList::DecodeTargetFrame(uint8_t *packet, int packetLen)
-{
-	cnt = 0;
-	gettimeofday(&pktTime, nullptr);
-	int fc = (packet[0] == ISYS_FRM_CTRL_SD2 /* check SD2 Frame */) ? 6 /* variable length frames */
-																	: 3 /* fixed length frames */;
-	int output_number = packet[fc + 1];
-	int nrOfTargets = packet[fc + 2];
-	/* check for valid amount of targets */
-	if (nrOfTargets == 0xff)
-	{ // 0xff means clipping, A frame with clipping doesn’t have any targets
-		return 0xFF;
-	}
-	else if (nrOfTargets > MAX_TARGETS)
-	{
-		return -1;
-	}
-	if ((nrOfTargets * 7 + fc + 3 + 2) != packetLen) // check len
-	{
-		return -1;
-	}
-	int64_t usec = Timeval2us(pktTime);
-	auto pData = &packet[fc + 3];
-	for (int i = 0; i < nrOfTargets; i++)
-	{
-		auto &v = vehicles[cnt];
-		// time
-		v.usec = usec;
-		// Signal
-		v.signal = *pData;
-		pData += 1;
-		// Velocity
-		v.speed = Cnvt::GetS16hl(pData) * 3600 / 100000; // 0.01m/s -> km/h;
-		pData += 2;
-		// Range: 4004 & 6003 => -32768 … 32767 [mm]; others => -32768 … 32767 [cm]
-		v.range = Cnvt::GetS16hl(pData);
-		pData += 2;
-		// angle
-		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
-		pData += 2;
-		if (v.signal >= uciradar.minSignal && v.speed >= uciradar.minSpeed && v.speed <= uciradar.maxSpeed && v.range >= uciradar.minRange)
-		{
-			cnt++;
-		}
-	}
-	return cnt;
 }
 
 void TargetList::MakeTargetMsg(uint8_t *buf, int *len)
@@ -262,7 +211,7 @@ void TargetList::MakeTargetMsg(uint8_t *buf, int *len)
 	*ptr++ = cnt;
 	for (int i = 0; i < cnt; i++)
 	{
-		auto &v = vehicles[i];
+		auto &v = vClos[i];
 		*ptr++ = v.signal;
 		ptr = Cnvt::PutU16(v.speed * 100000 / 3600, ptr);
 		ptr = Cnvt::PutU16(v.range, ptr);
@@ -312,14 +261,7 @@ int TargetList::SaveTarget(const char *comment)
 		char xbuf[1024];
 		xbuf[0] = 0;
 		hasVehicle = true;
-		if (uciradar.radarMode == 0)
-		{
-			Print(xbuf);
-		}
-		else if (uciradar.radarMode == 1)
-		{
-			minRangeVehicle->Print(xbuf);
-		}
+		minRangeVehicle->Print(xbuf);
 		csv.SaveRadarMeta(pktTime, comment, xbuf);
 	}
 	return 0;
@@ -334,7 +276,7 @@ int TargetList::Print(char *buf)
 		{
 			buf[len++] = ',';
 		}
-		len += vehicles[i].Print(buf + len);
+		len += vClos[i].Print(buf + len);
 	}
 	return len;
 }
@@ -345,20 +287,7 @@ int TargetList::Print()
 	Print(buf);
 	return printf("%s\n", buf);
 }
-
-void TargetList::Refresh()
-{
-	minRangeVehicle = &vehicles[0];
-	for (int i = 1; i < cnt; i++)
-	{
-		auto &v = vehicles[i];
-		if (v.range < minRangeVehicle->range)
-		{
-			minRangeVehicle = &vehicles[i];
-		}
-	}
-	vfilter.PushVehicle(minRangeVehicle);
-}
+#endif
 
 bool iSys400xPower::TaskRePower_(int *_ptLine)
 {
@@ -379,8 +308,8 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	PT_END();
 }
 
-iSys400x::iSys400x(int channel, UciRadar &uciradar, std::vector<int> &distance)
-	: channel(channel), IRadar(uciradar), targetlist(uciradar), distance(distance)
+iSys400x::iSys400x(UciRadar &uciradar)
+	: IRadar(uciradar)
 {
 	oprSp = new OprSp(uciradar.radarPort, uciradar.radarBps, nullptr);
 	radarStatus = RadarStatus::POWER_UP;
@@ -534,7 +463,7 @@ void iSys400x::CmdSetFreqChannel()
 	uint8_t *buf = new uint8_t[len + 2];
 	memcpy(buf, set_FreqChannel, len);
 	buf[len++] = 0;
-	buf[len++] = channel;
+	buf[len++] = uciradar.radarMode;
 	SendSd2(buf, len);
 	delete[] buf;
 }
@@ -558,7 +487,6 @@ void iSys400x::CmdReadTargetList()
 void iSys400x::Reset()
 {
 	TaskRadarPoll_Reset();
-	TaskRangeReset();
 }
 
 void iSys400x::TaskRadarPoll_Reset()
@@ -566,29 +494,20 @@ void iSys400x::TaskRadarPoll_Reset()
 	packetLen = 0;
 	ClearRxBuf();
 	taskRadarPoll_ = 0;
-	targetlist.Reset();
 	ssTimeout.Setms(ISYS_TIMEOUT);
 	isConnected = Utils::STATE3::S3_NA;
 }
 
-void iSys400x::TaskRangeReset()
-{
-	tmrRange.Clear();
-	tmrSpeculation.Clear();
-	v1st.Reset();
-	v2nd.Reset();
-}
-
 bool iSys400x::TaskRadarPoll()
 {
-	if (iSys400xPwr->iSysPwr == iSys400xPower::PwrSt::PWR_ON)
+	if (isys400xpwr->iSysPwr == iSys400xPower::PwrSt::PWR_ON)
 	{
 		TaskRadarPoll_(&taskRadarPoll_);
 		if (ssTimeout.IsExpired())
 		{
 			if (tmrPwrDelay.IsExpired())
 			{
-				iSys400xPwr->AutoPwrOff();
+				isys400xpwr->AutoPwrOff();
 				radarStatus = RadarStatus::NO_CONNECTION;
 				if (!IsNotConnected())
 				{
@@ -648,14 +567,13 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			{
 				if (DecodeDeviceName() == 0)
 				{
-					radarStatus = RadarStatus::EVENT;
+					radarStatus = RadarStatus::INITIALIZING;
 					ssTimeout.Setms(ISYS_TIMEOUT);
 				}
 			}
-		} while (radarStatus != RadarStatus::EVENT);
+		} while (radarStatus != RadarStatus::INITIALIZING);
 		PT_YIELD();
 		// stop and set channel
-		radarStatus = RadarStatus::INITIALIZING;
 		do
 		{
 			CmdStopAcquisition();
@@ -668,15 +586,14 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			CmdReadFreqChannel();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			if (DecodeFreqChannel() == channel)
+			if (DecodeFreqChannel() == uciradar.radarMode)
 			{
-				radarStatus = RadarStatus::EVENT;
+				radarStatus = RadarStatus::BUSY;
 				ssTimeout.Setms(ISYS_TIMEOUT);
 			}
-		} while (radarStatus != RadarStatus::EVENT);
+		} while (radarStatus != RadarStatus::BUSY);
 		PT_YIELD();
 		// start
-		radarStatus = RadarStatus::INITIALIZING;
 		do
 		{
 			CmdStartAcquisition();
@@ -684,7 +601,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if (VerifyCmdAck(RADAR_CMD_START))
 			{
-				radarStatus = RadarStatus::EVENT;
+				radarStatus = RadarStatus::READY;
 				ssTimeout.Setms(ISYS_TIMEOUT);
 			}
 			else
@@ -693,33 +610,32 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				tmrTaskRadar.Setms(100 - 1);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			}
-		} while (radarStatus != RadarStatus::EVENT);
+		} while (radarStatus != RadarStatus::READY);
 		PT_YIELD();
 
 		// read target list
-		radarStatus = RadarStatus::READY;
 		do
 		{
 			ClearRxBuf();
 			CmdReadTargetList();
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			if (ReadPacket() > 0)
+			gettimeofday(&pktTime, nullptr);
+			int x = DecodeTargetFrame();
+			if (x >= 0)
 			{
-				int x = targetlist.DecodeTargetFrame(packet, packetLen);
-				targetlist.flag = x;
-				if (x >= 0)
+				radarStatus = RadarStatus::EVENT;
+				ssTimeout.Setms(ISYS_TIMEOUT);
+				if (GetVdebug() >= 3)
 				{
-					if (x == 0 || x == 0xFF)
+					if (vClos.IsValid())
 					{
-						targetlist.minRangeVehicle = nullptr;
+						//vClos.Print();
 					}
-					else
+					if (vAway.IsValid())
 					{
-						targetlist.Refresh();
+						vAway.Print();
 					}
-					radarStatus = RadarStatus::EVENT;
-					ssTimeout.Setms(ISYS_TIMEOUT);
 				}
 			}
 		} while (true);
@@ -727,6 +643,86 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 	PT_END();
 }
 
+int iSys400x::DecodeTargetFrame()
+{
+	int64_t usec = Timeval2us(pktTime);
+	vClos.Reset();
+	vClos.usec = usec;
+	vAway.Reset();
+	vAway.usec = usec;
+
+	if (ReadPacket() <= 0)
+	{
+		return -1;
+	}
+
+	int cnt = 0;
+	int fc = (packet[0] == ISYS_FRM_CTRL_SD2 /* check SD2 Frame */) ? 6 /* variable length frames */
+																	: 3 /* fixed length frames */;
+	int output_number = packet[fc + 1];
+	int nrOfTargets = packet[fc + 2];
+	/* check for valid amount of targets */
+	if (nrOfTargets == 0xff)
+	{ // 0xff means clipping, A frame with clipping doesn’t have any targets
+		return 0xFF;
+	}
+	else if (nrOfTargets > MAX_TARGETS || (nrOfTargets * 7 + fc + 3 + 2) != packetLen)
+	{
+		return -1;
+	}
+	else if (nrOfTargets == 0)
+	{
+		return 0;
+	}
+	auto pData = &packet[fc + 3];
+	for (int i = 0; i < nrOfTargets; i++)
+	{
+		Vehicle v;
+		// time
+		v.usec = usec;
+		// Signal
+		v.signal = *pData;
+		pData += 1;
+		// Velocity
+		v.speed = Cnvt::GetS16hl(pData) * 3600 / 100000; // 0.01m/s -> km/h;
+		pData += 2;
+		// Range: 4004 & 6003 => -32768 … 32767 [mm]; others => -32768 … 32767 [cm]
+		v.range = Cnvt::GetS16hl(pData);
+		pData += 2;
+		// angle
+		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
+		pData += 2;
+
+		if (v.signal >= uciradar.minSignal && v.range >= uciradar.minClos && v.range <= uciradar.maxClos)
+		{
+			if (v.speed >= uciradar.minSpeed && v.speed <= uciradar.maxSpeed)
+			{
+				if (!vClos.IsValid() || vClos.range > v.range)
+				{
+					memcpy(&vClos, &v, sizeof(Vehicle));
+					cnt |= 1;
+				}
+			}
+			else
+			{
+				if (v.speed < 0)
+				{
+					if ((-v.speed) >= uciradar.minSpeed && (-v.speed) <= uciradar.maxSpeed)
+					{
+						if (!vAway.IsValid() || vAway.range > v.range)
+						{
+							memcpy(&vAway, &v, sizeof(Vehicle));
+							cnt |= 2;
+						}
+					}
+				}
+			}
+		}
+	}
+	return cnt;
+}
+
+#if 0
 int iSys400x::SaveTarget(const char *comment)
 {
 	if (Vdebug() >= 3)
@@ -754,7 +750,7 @@ int iSys400x::CheckRange(int &speed)
 	int speculation = 0;
 	auto Speculate_v1st = [&]
 	{
-		if (v1st.IsValid() && v1st.isClosing && v1st.vk.speed > 5 &&
+		if (v1st.IsValid() && v1st.isCA && v1st.vk.speed > 5 &&
 			(v1st.uciRangeIndex < distance.size()) && !tmrSpeculation.IsExpired())
 		{ // refresh v1st based on speculation
 			if (tmrSpeculation.IsClear())
@@ -847,17 +843,17 @@ int iSys400x::CheckRange(int &speed)
 		{
 			if (v1st.IsValid())
 			{
-				v1st.isClosing = true;
+				v1st.isCA = true;
 			}
 			if (v2nd.IsValid())
 			{
-				v2nd.isClosing = true;
+				v2nd.isCA = true;
 			}
 		}
 	}
 
 	int photo = NO_PHOTO;
-	if (v1st.isClosing && v1st.uciRangeIndex < distance.size())
+	if (v1st.isCA && v1st.uciRangeIndex < distance.size())
 	{
 		if ((v1st.uciRangeIndex != 0 || v1st.vk.range > distance.back()) && v1st.vk.range <= distance[v1st.uciRangeIndex])
 		{
@@ -879,7 +875,7 @@ int iSys400x::CheckRange(int &speed)
 	}
 	if (v2nd.IsValid())
 	{
-		if (v2nd.isClosing && v2nd.uciRangeIndex < distance.size())
+		if (v2nd.isCA && v2nd.uciRangeIndex < distance.size())
 		{
 			if (v2nd.vk.range <= distance[v2nd.uciRangeIndex])
 			{
@@ -921,6 +917,8 @@ int iSys400x::CheckRange(int &speed)
 	return photo;
 }
 
+#endif
+
 #if 0
 #include <3rdparty/catch2/EnableTest.h>
 #if _ENABLE_TEST_ == 1
@@ -937,18 +935,18 @@ int iSys400x::CheckRange(int &speed)
 
 			TargetList list1{name, 4001};
 			list1.cnt = 1;
-			list1.vehicles[0] = {60, 80, 15000, 12};
+			list1.vClos[0] = {60, 80, 15000, 12};
 
 			TargetList list2{name, 4001};
 			list2.cnt = 2;
-			list2.vehicles[0] = {60, 80, 14000, 12};
-			list2.vehicles[1] = {61, 70, 15000, 12};
+			list2.vClos[0] = {60, 80, 14000, 12};
+			list2.vClos[1] = {61, 70, 15000, 12};
 
 			TargetList list3{name, 4001};
 			list3.cnt = 3;
-			list3.vehicles[0] = {60, 80, 13000, 12};
-			list3.vehicles[1] = {61, 70, 14000, 12};
-			list3.vehicles[2] = {62, 60, 15000, 12};
+			list3.vClos[0] = {60, 80, 13000, 12};
+			list3.vClos[1] = {61, 70, 14000, 12};
+			list3.vClos[2] = {62, 60, 15000, 12};
 
 			TargetList target{name, 4001};
 

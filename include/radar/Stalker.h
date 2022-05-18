@@ -8,6 +8,7 @@
 #include <radar/IRadar.h>
 #include <fsworker/SaveCSV.h>
 #include <module/ptcpp.h>
+#include <module/IPeriodicRun.h>
 #include <uci/UciSettings.h>
 #include <module/BootTimer.h>
 
@@ -21,8 +22,8 @@ namespace Radar
             DBG1(){};
             DBG1(const char *dbg1) { Init(dbg1); };
             timeval time;
-            int number; // if number == 00, it means a new cycle
-            int id{-1}; // if id == -1, it means this class is empty
+            int number;   // if number == 00, it means a new cycle
+            int id{-1};   // if id == -1, it means this class is empty
             char lastDir; // 'A':away / 'C':close / '?':unknown/both
             int lastSp;
             char pkDir;
@@ -74,6 +75,7 @@ namespace Radar
             bool newVehicle{false};
             bool hasVehicle{false};
             int vdebug{0};
+            int stkrCapture{0};
 
         private:
             SaveCSV csv;
@@ -88,13 +90,15 @@ namespace Radar
         };
 
         /// \brief
-        class StalkerStat : public IRadar
+        class StalkerTSS2 : public IRadar, public IPeriodicRun
         {
         public:
-            StalkerStat(UciRadar &uciradar);
-            virtual ~StalkerStat();
+            StalkerTSS2(UciRadar &uciradar);
+            virtual ~StalkerTSS2();
 
             virtual int RxCallback(uint8_t *buf, int len) override;
+
+            virtual void PeriodicRun() override { TaskRadarPoll(); };
 
             virtual bool TaskRadarPoll() override;
 
@@ -102,18 +106,15 @@ namespace Radar
             void NewVehicle(bool v) { vehicleList.newVehicle = v; };
 
             VehicleList vehicleList;
-            
+
             virtual RadarStatus GetStatus() override;
 
-            virtual void Vdebug(int v) override
+            virtual void SetVdebug(int v) override
             {
-                vdebug = vehicleList.vdebug = v;
+                IRadar::SetVdebug(v);
+                vehicleList.vdebug = v;
             };
-
-            virtual int Vdebug() override
-            {
-                return vdebug;
-            };
+            void SetCapture(int v) { vehicleList.stkrCapture = v; };
 
         protected:
 #define DBG1_SIZE 33
@@ -123,3 +124,5 @@ namespace Radar
 
     }
 }
+
+extern Radar::Stalker::StalkerTSS2 *stalkerTSS2[2];

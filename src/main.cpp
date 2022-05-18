@@ -24,10 +24,10 @@
 
 #include <module/DebugConsole.h>
 
-#include <radar/Monitor.h>
 #include <radar/iSys.h>
+#include <radar/Stalker.h>
 #include <fsworker/SpaceGC.h>
-
+#include <controller/Controller.h>
 #include <websocket/WsServer.h>
 
 const char *mainpath;
@@ -169,14 +169,25 @@ int main(int argc, char *argv[])
             tmrEvt100ms->Add(cameras[i]);
         }
 
-        iSys400xPwr = new Radar::iSys::iSys400xPower();
-        tmrEvt100ms->Add(iSys400xPwr);
+        isys400xpwr = new Radar::iSys::iSys400xPower();
+        tmrEvt100ms->Add(isys400xpwr);
 
-        // monitor
-        monitors[0] = new Monitor(1, cameras);
-        tmrEvt10ms->Add(monitors[0]);
-        monitors[1] = new Monitor(2, cameras);
-        tmrEvt10ms->Add(monitors[1]);
+        for(int i=0;i<2;i++)
+        {
+            stalkerTSS2[i] = new Radar::Stalker::StalkerTSS2(DbHelper::Instance().GetUciSettings().uciStalker[i]);
+            tmrEvt10ms->Add(stalkerTSS2[i]);
+            isys400x[i] = new Radar::iSys::iSys400x(DbHelper::Instance().GetUciSettings().uciiSys[i]);
+            tmrEvt10ms->Add(isys400x[i]);
+        }
+
+        for (int i = 0; i < 2; i++)
+        {
+            monitors[i] = new Monitor(i + 1, cameras, stalkerTSS2, isys400x);
+        }
+
+        // controller
+        auto controller = new Controller();
+        tmrEvt10ms->Add(controller);
 
         PrintDbg(DBG_LOG, ">>> DONE >>>");
         printf("\n=>Input '?<Enter>' to get console help.\n\n");
