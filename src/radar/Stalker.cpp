@@ -89,7 +89,7 @@ int VehicleList::PushDgb1(const char *dbg1)
             gettimeofday(&time, nullptr);
             newVehicle = false;
             vlist.clear(); // as there is no vhicle, clear all vehicles in list
-            if (vdebug >= 2)
+            if (GetVdebug() > 0)
             {
                 Print();
             }
@@ -127,11 +127,11 @@ int VehicleList::PushDgb1(const char *dbg1)
                 newv->dbg1list.push_back(d);
                 vlist.push_back(newv);
                 newVehicle = true;
-                if (vdebug >= 2)
+                if (GetVdebug() > 0)
                 {
                     PrintDbg(DBG_PRT, "New %s:ID=%04d", (d->lastDir == 'A') ? "AWAY" : "CLOS", d->id);
                 }
-                if (vdebug >= 3)
+                if (GetVdebug() > 0)
                 {
                     Print();
                 }
@@ -165,13 +165,10 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
         { // vehicle disappeared
             auto id = (*v)->dbg1list.back()->id;
             v = vlist.erase(v); // erase current and iterate next
-            if (vdebug >= 2)
-            {
-                PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
-            }
-            if (vdebug >= 3)
+            if (GetVdebug() > 0)
             {
                 Print();
+                PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
             }
         }
         else
@@ -222,7 +219,7 @@ int StalkerTSS2::RxCallback(uint8_t *data, int len)
                 dbg1buf[dbg1len] = '\0';
                 if (vehicleList.PushDgb1((const char *)dbg1buf) >= 0)
                 {
-                    if (dbg1len != 0 && GetVdebug() >= 3)
+                    if (dbg1len != 0 && GetVdebug() > 0)
                     {
                         PrintDbg(DBG_PRT, "%s", dbg1buf);
                     }
@@ -260,7 +257,7 @@ RadarStatus StalkerTSS2::GetStatus()
         vehicleList.PushDgb1((const char *)dbg1buf);
         radarStatus = RadarStatus::EVENT;
         ssTimeout.Clear();
-        if (GetVdebug() >= 2)
+        if (GetVdebug() > 0)
         {
             PrintDbg(DBG_PRT, "%s ssTimeout\n", uciradar.name.c_str());
         }

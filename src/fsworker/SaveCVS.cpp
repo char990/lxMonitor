@@ -32,8 +32,8 @@ SaveCSV::~SaveCSV()
 int SaveCSV::SaveRadarMeta(int64_t &us, const char *comment, const char *meta)
 {
     struct timeval time;
-    time.tv_sec = us/0x100000000;
-    time.tv_usec = us%0x100000000;
+    time.tv_sec = us/1000000;
+    time.tv_usec = us%1000000;
     return SaveRadarMeta(time, comment, meta);
 }
 
@@ -111,6 +111,6 @@ int SaveCSV::SaveRadarMeta(struct timeval &time, const char *comment, const char
                 return 0;
             }
         }
-    }
+    };
     return -1;
 }

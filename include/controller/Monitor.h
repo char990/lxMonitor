@@ -33,17 +33,21 @@ private:
     Camera **cams;
 
     /*********************iSysClos********************/
+    BootTimer tmriSysClos;
     Radar::iSys::VehicleFilter vfiSysClos;
     int lastClosRange{-1};
     int IsNewiSysClos();
     int PhotoByiSysClosDistance();
     int distanceIndex{0};
+    int iSysClosWillStop{0};
 
     /*********************iSysAway********************/
+    BootTimer tmriSysAway;
     Radar::iSys::VehicleFilter vfiSysAway;
     int lastAwayRange{-1};
     BootTimer tmrVstopDly;
     int IsNewiSysAway();
+    int iSysAwayWillStop{0};
 
     /*********************TaskRange********************/
     BootTimer tmrRange, tmrSpeculation;

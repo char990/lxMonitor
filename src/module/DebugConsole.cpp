@@ -29,10 +29,10 @@ const Command DebugConsole::CMD_LIST[] = {
      "\t| Set camera 1-3 debug. Usage: cam 1-3 X",
      DebugConsole::Cmd_cam},
     {"stkr",
-     "Stalker 1|2 debug info X. Usage: stkr 1|2 X",
+     "Stalker 1|2 debug info X(0:Off, 1:Clos). Usage: stkr 1|2 X",
      DebugConsole::Cmd_stkr},
     {"isys",
-     "iSys400x 1|2 debug info X. Usage: isys 1|2 X\n"
+     "iSys400x 1|2 debug info X(0:Off, 1:Clos, 2:Away, 3:Both). Usage: isys 1|2 X\n"
      "\t| iSys400x power on|off. Usage: isys on|off",
      DebugConsole::Cmd_isys},
     {"monitor",

@@ -13,6 +13,8 @@ Monitor *monitors[2];
 #error TMR_RANGE should greater than TMR_SPECULATION
 #endif
 
+#define ISYS_VEHICLE_VALID_TIMEOUT (ucimonitor.vstopDelay + 5000)
+
 Monitor::Monitor(int id, Camera **cams, Radar::Stalker::StalkerTSS2 **tss2, Radar::iSys::iSys400x **isys)
     : id(id), cams(cams), isys400xs(isys), stalkers(tss2),
       ucimonitor(DbHelper::Instance().GetUciSettings().uciMonitor[id - 1])
@@ -255,6 +257,7 @@ void Monitor::TaskiSys1()
         auto isys400x = isys400xs[ucimonitor.isysClos - 1];
         if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vClos.IsValid())
         {
+            tmriSysClos.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
             vfiSysClos.PushVehicle(&isys400x->vClos);
             if (vfiSysClos.isCA) // closing
             {
@@ -277,6 +280,17 @@ void Monitor::TaskiSys1()
                 isyscsv->SaveRadarMeta(isys400x->vClos.usec, "", buf);
             }
         }
+        else if (tmriSysClos.IsExpired())
+        {
+            tmriSysClos.Clear();
+            vfiSysClos.Reset();
+            distanceIndex = 0;
+            lastClosRange = -1;
+            if (GetVdebug() >= 2)
+            {
+                PrintDbg(DBG_PRT, "Monitor[%d]: iSysClos timeout", id);
+            }
+        }
     }
     /******************* Away *******************/
     {
@@ -284,7 +298,7 @@ void Monitor::TaskiSys1()
         auto isys400x = isys400xs[ucimonitor.isysAway - 1];
         if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vAway.IsValid())
         {
-
+            tmriSysAway.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
             vfiSysAway.PushVehicle(&isys400x->vAway);
             if (vfiSysAway.isCA) // away
             {
@@ -296,6 +310,15 @@ void Monitor::TaskiSys1()
                 if (GetVdebug() >= 3)
                 {
                     PrintDbg(DBG_PRT, "Monitor[%d]: lastAwayRange=%d, isys400x->vAway.range=%d", id, lastAwayRange, isys400x->vAway.range);
+                }
+                if (iSysAwayWillStop == 0 && vfiSysAway.isSlowdown && isys400x->vAway.range < ucimonitor.stopPass && (-isys400x->vClos.speed) < 5)
+                {
+                    iSysAwayWillStop = 1;
+                    tmrVstopDly.Setms(ucimonitor.vstopDelay);
+                    if (GetVdebug() >= 2)
+                    {
+                        PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - iSysAwayWillStop", id);
+                    }
                 }
                 if (lastAwayRange < ucimonitor.stopPass && isys400x->vAway.range >= ucimonitor.stopPass)
                 {
@@ -325,14 +348,27 @@ void Monitor::TaskiSys1()
                 isyscsv->SaveRadarMeta(isys400x->vAway.usec, " ", buf);
             }
         }
-        if (!tmrVstopDly.IsClear() && tmrVstopDly.IsExpired())
+        else if (tmriSysAway.IsExpired() && tmrVstopDly.IsClear())
         {
-            tmrVstopDly.Clear();
-            cams[ucimonitor.camVstop - 1]->TakePhoto();
-            isyscsv->SaveRadarMeta("Photo taken: Timer timeout", " ");
+            tmriSysAway.Clear();
+            vfiSysAway.Reset();
+            lastAwayRange = -1;
+            iSysAwayWillStop = 0;
             if (GetVdebug() >= 2)
             {
-                PrintDbg(DBG_PRT, "Monitor[%d]: Photo taken: Timer timeout", id);
+                PrintDbg(DBG_PRT, "Monitor[%d]: iSysAway timeout", id);
+            }
+        }
+        if (tmrVstopDly.IsExpired())
+        {
+            tmrVstopDly.Clear();
+            tmriSysAway.Clear();
+            iSysAwayWillStop = 0;
+            cams[ucimonitor.camVstop - 1]->TakePhoto();
+            isyscsv->SaveRadarMeta("Photo taken: Vehicle Stop timeout", " ");
+            if (GetVdebug() >= 2)
+            {
+                PrintDbg(DBG_PRT, "Monitor[%d]: Photo taken: Vehicle Stop timeout", id);
             }
         }
     }
@@ -343,64 +379,86 @@ void Monitor::TaskiSys2()
     char buf[128];
     int photo;
     /******************* Clos *******************/
+    photo = 0;
+    auto isys400x = isys400xs[ucimonitor.isysClos - 1];
+    if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vClos.IsValid())
     {
-        photo = 0;
-        auto isys400x = isys400xs[ucimonitor.isysClos - 1];
-        if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vClos.IsValid())
+        tmriSysClos.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
+        vfiSysClos.PushVehicle(&isys400x->vClos);
+        if (vfiSysClos.isCA) // closing
         {
-            vfiSysClos.PushVehicle(&isys400x->vClos);
-            if (vfiSysClos.isCA) // closing
+            if (IsNewiSysClos())
             {
-                if (IsNewiSysClos())
+                distanceIndex = 0;
+                tmrVstopDly.Clear();
+                lastClosRange = ucimonitor.distance[0];
+            }
+            if (iSysClosWillStop == 0 && vfiSysClos.isSlowdown && isys400x->vClos.range > ucimonitor.stopPass && isys400x->vClos.speed < 5)
+            {
+                iSysClosWillStop = 1;
+                tmrVstopDly.Setms(ucimonitor.vstopDelay);
+                if (GetVdebug() >= 2)
                 {
-                    distanceIndex = 0;
-                    tmrVstopDly.Clear();
-                    lastClosRange = ucimonitor.distance[0];
+                    PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - iSysClosWillStop", id);
                 }
-                if (lastClosRange > ucimonitor.stopPass && isys400x->vClos.range <= ucimonitor.stopPass)
+            }
+            if (lastClosRange > ucimonitor.stopPass && isys400x->vClos.range <= ucimonitor.stopPass)
+            {
+                photo = 1;
+                cams[ucimonitor.camRange - 1]->TakePhoto();
+                tmrVstopDly.Clear();
+                isys400x->vClos.Print(buf);
+                isyscsv->SaveRadarMeta(isys400x->vClos.usec, "Photo taken: Vehicle passed Stop line", buf);
+                if (GetVdebug() >= 2)
+                {
+                    PrintDbg(DBG_PRT, "Monitor[%d]: Photo taken: Vehicle passed Stop line, range=%d", id, isys400x->vClos.range);
+                }
+            }
+            else if (lastClosRange > ucimonitor.stopTrigger && isys400x->vClos.range <= ucimonitor.stopTrigger)
+            {
+                tmrVstopDly.Setms(ucimonitor.vstopDelay);
+                if (GetVdebug() >= 2)
+                {
+                    PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - passed stopTrigger", id);
+                }
+            }
+            else if (distanceIndex < ucimonitor.distance.size() && isys400x->vClos.range > ucimonitor.stopPass)
+            {
+                if (PhotoByiSysClosDistance())
                 {
                     photo = 1;
-                    cams[ucimonitor.camRange - 1]->TakePhoto();
-                    tmrVstopDly.Clear();
-                    isys400x->vClos.Print(buf);
-                    isyscsv->SaveRadarMeta(isys400x->vClos.usec, "Photo taken: Vehicle passed Stop line", buf);
-                    if (GetVdebug() >= 2)
-                    {
-                        PrintDbg(DBG_PRT, "Monitor[%d]: Photo taken: Vehicle passed Stop line, range=%d", id, isys400x->vClos.range);
-                    }
                 }
-                else if (lastClosRange > ucimonitor.stopTrigger && isys400x->vClos.range <= ucimonitor.stopTrigger)
-                {
-                    tmrVstopDly.Setms(ucimonitor.vstopDelay);
-                    if (GetVdebug() >= 2)
-                    {
-                        PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts", id);
-                    }
-                }
-                else if (distanceIndex < ucimonitor.distance.size())
-                {
-                    if (PhotoByiSysClosDistance())
-                    {
-                        photo = 1;
-                    }
-                }
-                lastClosRange = isys400x->vClos.range;
             }
-            if (photo == 0)
-            {
-                isys400x->vClos.Print(buf);
-                isyscsv->SaveRadarMeta(isys400x->vClos.usec, "", buf);
-            }
+            lastClosRange = isys400x->vClos.range;
+        }
+        if (photo == 0)
+        {
+            isys400x->vClos.Print(buf);
+            isyscsv->SaveRadarMeta(isys400x->vClos.usec, "", buf);
         }
     }
-    if (!tmrVstopDly.IsClear() && tmrVstopDly.IsExpired())
+    else if (tmriSysClos.IsExpired() && tmrVstopDly.IsClear())
     {
-        tmrVstopDly.Clear();
-        cams[ucimonitor.camRange - 1]->TakePhoto();
-        isyscsv->SaveRadarMeta("Photo taken: Timer timeout", " ");
+        tmriSysClos.Clear();
+        vfiSysClos.Reset();
+        iSysClosWillStop = 0;
+        distanceIndex = 0;
+        lastClosRange = -1;
         if (GetVdebug() >= 2)
         {
-            PrintDbg(DBG_PRT, "Monitor[%d]: Photo taken: Timer timeout", id);
+            PrintDbg(DBG_PRT, "Monitor[%d]: iSysClos timeout", id);
+        }
+    }
+    if (tmrVstopDly.IsExpired())
+    {
+        tmrVstopDly.Clear();
+        iSysClosWillStop = 0;
+        tmriSysClos.Clear();
+        cams[ucimonitor.camRange - 1]->TakePhoto();
+        isyscsv->SaveRadarMeta("Photo taken: Vehicle Stop timeout", " ");
+        if (GetVdebug() >= 2)
+        {
+            PrintDbg(DBG_PRT, "Monitor[%d]: Photo taken: Vehicle Stop timeout", id);
         }
     }
 }

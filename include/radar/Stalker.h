@@ -66,7 +66,7 @@ namespace Radar
             std::list<std::shared_ptr<DBG1>> dbg1list;
         };
 
-        class VehicleList
+        class VehicleList: public Vdebug
         {
         public:
             VehicleList(std::string &name) : name(name), csv(name + "DBG1"){};
@@ -74,7 +74,6 @@ namespace Radar
             int PushDgb1(const char *dbg1);
             bool newVehicle{false};
             bool hasVehicle{false};
-            int vdebug{0};
             int stkrCapture{0};
 
         private:
@@ -112,7 +111,7 @@ namespace Radar
             virtual void SetVdebug(int v) override
             {
                 IRadar::SetVdebug(v);
-                vehicleList.vdebug = v;
+                vehicleList.SetVdebug(v);
             };
             void SetCapture(int v) { vehicleList.stkrCapture = v; };
 

@@ -52,15 +52,16 @@ namespace Radar
         {
         public:
 #define VF_SIZE 2
-            VehicleFilter() {};
+            VehicleFilter(){};
             VehicleFilter(int cmErr) : cmErr(cmErr)
             {
                 Reset();
             };
             void PushVehicle(Vehicle *v);
             Vehicle items[VF_SIZE + 1];
-            bool isCA{false};       // Closing or Away confirmed
+            bool isCA{false}; // Closing or Away confirmed
             bool isSlowdown{false};
+            bool isSpeedUp{false};
             int cmErr;
             void Reset();
         };
@@ -205,6 +206,7 @@ namespace Radar
             void CmdReadTargetList();
             void CmdReadAppSetting(uint8_t index);
             void CmdWriteAppSetting(uint8_t index, int16_t data);
+            int DecodeAppSetting();
             void CmdSaveToEEprom();
 
             bool VerifyCmdAck(uint8_t cmd);
@@ -225,6 +227,16 @@ namespace Radar
             int taskRadarPoll_{0};
             bool TaskRadarPoll_(int *_ptLine);
             void TaskRadarPoll_Reset();
+
+            // Settings tmr
+            BootTimer tmrTaskRadarSettings;
+            bool writeToEEP{false};
+            /*********************TaskRadarReadSettings********************/
+            int taskRadarRS{0};
+            bool TaskRadarReadSettings(int *_ptLine);
+            /*********************TaskRadarWriteSettings********************/
+            int taskRadarWS{0};
+            bool TaskRadarWriteSettings(int *_ptLine);
         };
     }
 }

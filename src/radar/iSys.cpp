@@ -175,6 +175,31 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 		}
 	}
 	isCA = true;
+	isSlowdown = false;
+	isSpeedUp = false;
+
+	if (items[0].speed > 0 && items[1].speed > 0 && items[2].speed > 0)
+	{
+		if (items[0].speed > items[1].speed && items[1].speed > items[2].speed > 0)
+		{
+			isSlowdown = true;
+		}
+		else if (items[0].speed < items[1].speed && items[1].speed<items[2].speed> 0)
+		{
+			isSpeedUp = true;
+		}
+	}
+	else if (items[0].speed < 0 && items[1].speed < 0 && items[2].speed < 0)
+	{
+		if (items[0].speed > items[1].speed && items[1].speed > items[2].speed > 0)
+		{
+			isSpeedUp = true;
+		}
+		else if (items[0].speed < items[1].speed && items[1].speed<items[2].speed> 0)
+		{
+			isSlowdown = true;
+		}
+	}
 };
 
 void VehicleFilter::Reset()
@@ -370,9 +395,19 @@ void iSys400x::CmdWriteAppSetting(uint8_t index, int16_t data)
 	SendSd2(cmd, 5);
 }
 
+int iSys400x::DecodeAppSetting()
+{
+	int c = -1;
+	if (VerifyCmdAck(RADAR_CMD_RD_APP_SETTING))
+	{
+		c = packet[ISYS_FRM_PDU] * 0x100 + packet[ISYS_FRM_PDU + 1];
+	}
+	return c;
+}
+
 void iSys400x::CmdSaveToEEprom()
 {
-	uint8_t cmd[2] = {RADAR_CMD_EEPROM, 0x03};
+	uint8_t cmd[2] = {RADAR_CMD_EEPROM, 0x04};
 	SendSd2(cmd, 2);
 }
 
@@ -473,7 +508,7 @@ int iSys400x::DecodeFreqChannel()
 	int c = -1;
 	if (VerifyCmdAck(RADAR_CMD_RD_FREQ_CHN))
 	{
-		c = packet[ISYS_FRM_PDU + 1];
+		c = packet[ISYS_FRM_PDU] * 0x100 + packet[ISYS_FRM_PDU + 1];
 		PrintDbg(DBG_LOG, "%s:freq channel:%d", uciradar.name.c_str(), c);
 	}
 	return c;
@@ -573,73 +608,135 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			}
 		} while (radarStatus != RadarStatus::INITIALIZING);
 		PT_YIELD();
-		// stop and set channel
 		do
 		{
-			CmdStopAcquisition();
-			tmrTaskRadar.Setms(100 - 1);
-			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			CmdSetFreqChannel();
-			tmrTaskRadar.Setms(100 - 1);
-			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			ClearRxBuf();
-			CmdReadFreqChannel();
-			tmrTaskRadar.Setms(100 - 1);
-			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			if (DecodeFreqChannel() == uciradar.radarMode)
-			{
-				radarStatus = RadarStatus::BUSY;
-				ssTimeout.Setms(ISYS_TIMEOUT);
-			}
-		} while (radarStatus != RadarStatus::BUSY);
-		PT_YIELD();
-		// start
-		do
-		{
-			CmdStartAcquisition();
-			tmrTaskRadar.Setms(100 - 1);
-			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			if (VerifyCmdAck(RADAR_CMD_START))
-			{
-				radarStatus = RadarStatus::READY;
-				ssTimeout.Setms(ISYS_TIMEOUT);
-			}
-			else
+			do
 			{
 				CmdStopAcquisition();
 				tmrTaskRadar.Setms(100 - 1);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+				taskRadarRS = 0;
+				PT_WAIT_TASK(TaskRadarReadSettings(&taskRadarRS));
+				if (taskRadarRS != -1)
+				{
+					PrintDbg(DBG_PRT, "%s settings error, Re-Write settings", uciradar.name.c_str());
+					taskRadarWS = 0;
+					PT_WAIT_TASK(TaskRadarWriteSettings(&taskRadarWS));
+					writeToEEP = true;
+					taskRadarWS = 0;
+				}
+			} while (taskRadarRS != -1);
+			PrintDbg(DBG_PRT, "%s settings OK", uciradar.name.c_str());
+			if (writeToEEP)
+			{
+				PrintDbg(DBG_PRT, "%s save settings to eeprom", uciradar.name.c_str());
+				CmdSaveToEEprom();
+				writeToEEP = false;
 			}
-		} while (radarStatus != RadarStatus::READY);
-		PT_YIELD();
-
-		// read target list
-		do
-		{
-			ClearRxBuf();
-			CmdReadTargetList();
+			radarStatus = RadarStatus::BUSY;
+			ssTimeout.Setms(ISYS_TIMEOUT);
 			tmrTaskRadar.Setms(100 - 1);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
-			gettimeofday(&pktTime, nullptr);
-			int x = DecodeTargetFrame();
-			if (x >= 0)
+			// start
+			do
 			{
-				radarStatus = RadarStatus::EVENT;
-				ssTimeout.Setms(ISYS_TIMEOUT);
-				if (GetVdebug() >= 3)
+				CmdStartAcquisition();
+				tmrTaskRadar.Setms(100 - 1);
+				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+				if (VerifyCmdAck(RADAR_CMD_START))
 				{
-					if (vClos.IsValid())
+					radarStatus = RadarStatus::READY;
+					ssTimeout.Setms(ISYS_TIMEOUT);
+				}
+				else
+				{
+					CmdStopAcquisition();
+					tmrTaskRadar.Setms(100 - 1);
+					PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+				}
+			} while (radarStatus != RadarStatus::READY);
+			PT_YIELD();
+			// read target list
+			tmrTaskRadarSettings.Setms(15 * 60 * 1000);
+			do
+			{
+				ClearRxBuf();
+				CmdReadTargetList();
+				tmrTaskRadar.Setms(100 - 1);
+				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+				gettimeofday(&pktTime, nullptr);
+				if (DecodeTargetFrame() >= 0)
+				{
+					radarStatus = RadarStatus::EVENT;
+					ssTimeout.Setms(ISYS_TIMEOUT);
+					if ((GetVdebug() & 1) && vClos.IsValid())
 					{
-						//vClos.Print();
+						vClos.Print();
 					}
-					if (vAway.IsValid())
+					if ((GetVdebug() & 2) && vAway.IsValid())
 					{
 						vAway.Print();
 					}
 				}
-			}
-		} while (true);
+				PT_YIELD();
+				if (tmrTaskRadarSettings.IsExpired())
+				{
+					PT_WAIT_TASK(TaskRadarReadSettings(&taskRadarRS));
+					if (taskRadarRS != -1)
+					{
+						taskRadarWS = 1;
+						PrintDbg(DBG_LOG, "%s settings error", uciradar.name.c_str());
+					}
+					tmrTaskRadarSettings.Setms(15 * 60 * 1000);
+				}
+			} while (taskRadarWS == 0);
+		} while (taskRadarWS == 0);
 	};
+	PT_END();
+}
+
+bool iSys400x::TaskRadarReadSettings(int *_ptLine)
+{
+	PT_BEGIN();
+	ClearRxBuf();
+	CmdReadFreqChannel();
+	tmrTaskRadar.Setms(100 - 1);
+	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+	if (DecodeFreqChannel() != uciradar.radarMode)
+	{
+		PT_ESCAPE();
+	}
+	ClearRxBuf();
+	CmdReadAppSetting(6);
+	tmrTaskRadar.Setms(100 - 1);
+	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+	if (DecodeAppSetting() != 0x0003)
+	{
+		PT_ESCAPE();
+	}
+	ClearRxBuf();
+	CmdReadAppSetting(7);
+	tmrTaskRadar.Setms(100 - 1);
+	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+	if (DecodeAppSetting() != 0)
+	{
+		PT_ESCAPE();
+	}
+	PT_END();
+}
+
+bool iSys400x::TaskRadarWriteSettings(int *_ptLine)
+{
+	PT_BEGIN();
+	CmdSetFreqChannel();
+	tmrTaskRadar.Setms(100 - 1);
+	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+	CmdWriteAppSetting(6, 0x0003); // Clos & Away
+	tmrTaskRadar.Setms(100 - 1);
+	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
+	CmdWriteAppSetting(7, 0); // OFF
+	tmrTaskRadar.Setms(100 - 1);
+	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	PT_END();
 }
 
@@ -693,27 +790,27 @@ int iSys400x::DecodeTargetFrame()
 		v.angle = Cnvt::GetS16hl(pData) / 100; // -327.68 … 327.67 [°]
 		pData += 2;
 
-		if (v.signal >= uciradar.minSignal && v.range >= uciradar.minClos && v.range <= uciradar.maxClos)
+		if (v.signal >= uciradar.minSignal)
 		{
-			if (v.speed >= uciradar.minSpeed && v.speed <= uciradar.maxSpeed)
+			if (v.speed >= 0)
 			{
-				if (!vClos.IsValid() || vClos.range > v.range)
+				if (v.range >= uciradar.minClos && v.range <= uciradar.maxClos && v.speed >= uciradar.minSpeed && v.speed <= uciradar.maxSpeed)
 				{
-					memcpy(&vClos, &v, sizeof(Vehicle));
-					cnt |= 1;
+					if (!vClos.IsValid() || v.range < vClos.range)
+					{
+						memcpy(&vClos, &v, sizeof(Vehicle));
+						cnt |= 1;
+					}
 				}
 			}
 			else
 			{
-				if (v.speed < 0)
+				if (v.range >= uciradar.minAway && v.range <= uciradar.maxAway && (-v.speed) >= uciradar.minSpeed && (-v.speed) <= uciradar.maxSpeed)
 				{
-					if ((-v.speed) >= uciradar.minSpeed && (-v.speed) <= uciradar.maxSpeed)
+					if (!vAway.IsValid() || v.range < vAway.range)
 					{
-						if (!vAway.IsValid() || vAway.range > v.range)
-						{
-							memcpy(&vAway, &v, sizeof(Vehicle));
-							cnt |= 2;
-						}
+						memcpy(&vAway, &v, sizeof(Vehicle));
+						cnt |= 2;
 					}
 				}
 			}
@@ -721,203 +818,6 @@ int iSys400x::DecodeTargetFrame()
 	}
 	return cnt;
 }
-
-#if 0
-int iSys400x::SaveTarget(const char *comment)
-{
-	if (Vdebug() >= 3)
-	{
-		if (targetlist.minRangeVehicle != nullptr)
-		{
-			targetlist.minRangeVehicle->Print();
-		}
-	}
-	return targetlist.SaveTarget(comment);
-}
-
-int iSys400x::SaveMeta(const char *comment, const char *details)
-{
-	if (Vdebug() >= 3)
-	{
-		PrintDbg(DBG_PRT, "\tMeta=%s,%s\n", comment, details);
-	}
-	return targetlist.SaveMeta(comment, details);
-}
-
-#define NO_PHOTO -1
-int iSys400x::CheckRange(int &speed)
-{
-	int speculation = 0;
-	auto Speculate_v1st = [&]
-	{
-		if (v1st.IsValid() && v1st.isCA && v1st.vk.speed > 5 &&
-			(v1st.uciRangeIndex < distance.size()) && !tmrSpeculation.IsExpired())
-		{ // refresh v1st based on speculation
-			if (tmrSpeculation.IsClear())
-			{
-				tmrSpeculation.Setms(TMR_SPECULATION);
-			}
-			struct timeval tv;
-			gettimeofday(&tv, nullptr);
-			int64_t usec = Timeval2us(tv);
-			int us = usec - v1st.vk.usec;
-			if (us > 0)
-			{
-				v1st.vk.usec = usec;
-				v1st.vk.range -= RangeCM_sp_us(v1st.vk.speed, us);
-				if (Vdebug() >= 3)
-				{
-					char buf[128];
-					v1st.vk.Print(buf);
-					PrintDbg(DBG_PRT, "\tv1st-Speculation:%s", buf);
-				}
-				speculation = 1;
-			}
-		}
-	};
-
-	auto v = targetlist.minRangeVehicle;
-	if (v == nullptr)
-	{
-		if (tmrRange.IsExpired())
-		{
-			if (Vdebug() >= 2)
-			{
-				PrintDbg(DBG_PRT, "tmrRange.IsExpired");
-			}
-			TaskRangeReset();
-			return NO_PHOTO;
-		}
-		if (!v1st.IsValid() || v1st.vk.range < distance.back())
-		{
-			return NO_PHOTO;
-		}
-		Speculate_v1st();
-	}
-	else
-	{
-		tmrRange.Setms(TMR_RANGE);
-		tmrSpeculation.Clear();
-		if (!v1st.IsValid())
-		{
-			if (v->range < distance.back())
-			{
-				return NO_PHOTO;
-			}
-			v1st.Reset();
-			v1st.Loadvk(v);
-			speculation = 0;
-		}
-		else
-		{
-			if (v1st.uciRangeIndex == 0 && v->range < distance.back())
-			{
-				return NO_PHOTO;
-			}
-			if (v2nd.IsValid())
-			{ // with v2nd exists, isys lost v1st
-				Speculate_v1st();
-				v2nd.Loadvk(v);
-			}
-			else
-			{ // no v2nd, there is only v1st
-				if (v1st.vk.range < uciradar.rangeLast && v->range > v1st.vk.range + uciradar.rangeRise)
-				{ // range suddenly changed, means new vehicle
-					// this is v2nd
-					Speculate_v1st();
-					v2nd.Reset();
-					v2nd.Loadvk(v);
-					if (Vdebug() >= 2)
-					{
-						PrintDbg(DBG_PRT, "\tnew v2 : v->range=%d", v->range);
-					}
-				}
-				else
-				{
-					v1st.Loadvk(v);
-					speculation = 0;
-				}
-			}
-		}
-		if (targetlist.IsClosing())
-		{
-			if (v1st.IsValid())
-			{
-				v1st.isCA = true;
-			}
-			if (v2nd.IsValid())
-			{
-				v2nd.isCA = true;
-			}
-		}
-	}
-
-	int photo = NO_PHOTO;
-	if (v1st.isCA && v1st.uciRangeIndex < distance.size())
-	{
-		if ((v1st.uciRangeIndex != 0 || v1st.vk.range > distance.back()) && v1st.vk.range <= distance[v1st.uciRangeIndex])
-		{
-			photo = 1;
-			speed = v1st.vk.speed;
-			if (Vdebug() >= 2)
-			{
-				PrintDbg(DBG_PRT, "\tphoto = [1]:uciRangeIndex=[%d],range=%d", v1st.uciRangeIndex, v1st.vk.range);
-			}
-			while (v1st.uciRangeIndex < distance.size() && v1st.vk.range <= distance[v1st.uciRangeIndex])
-			{
-				v1st.uciRangeIndex++;
-			};
-			if (Vdebug() >= 2)
-			{
-				PrintDbg(DBG_PRT, "\tv[1]st.uciRangeIndex=[%d]", v1st.uciRangeIndex);
-			}
-		}
-	}
-	if (v2nd.IsValid())
-	{
-		if (v2nd.isCA && v2nd.uciRangeIndex < distance.size())
-		{
-			if (v2nd.vk.range <= distance[v2nd.uciRangeIndex])
-			{
-				photo = 2;
-				speed = v2nd.vk.speed;
-				if (Vdebug() >= 2)
-				{
-					PrintDbg(DBG_PRT, "\tphoto = [2]:uciRangeIndex=[%d],range=%d", v2nd.uciRangeIndex, v2nd.vk.range);
-				}
-				while (v2nd.uciRangeIndex < distance.size() && v2nd.vk.range <= distance[v2nd.uciRangeIndex])
-				{
-					v2nd.uciRangeIndex++;
-				};
-			}
-		}
-	}
-
-	if (photo == 1)
-	{
-		photo = speculation ? distance.size() : v1st.uciRangeIndex - 1;
-		if (speculation || v1st.uciRangeIndex == distance.size()) // only v1st && speculation
-		{
-			TaskRangeReset();
-		}
-		if (v2nd.IsValid())
-		{
-			v1st.Clone(v2nd);
-			v2nd.Reset();
-			tmrSpeculation.Clear();
-		}
-	}
-	else if (photo == 2)
-	{
-		v1st.Clone(v2nd);
-		v2nd.Reset();
-		tmrSpeculation.Clear();
-		photo = v2nd.uciRangeIndex - 1;
-	}
-	return photo;
-}
-
-#endif
 
 #if 0
 #include <3rdparty/catch2/EnableTest.h>
