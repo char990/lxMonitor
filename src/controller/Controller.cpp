@@ -17,6 +17,27 @@ Controller::~Controller()
 
 void Controller::PeriodicRun()
 {
+    if(cameras[2]->alarm->IsHigh())
+    {
+        if(!Monitor::isTrainCrossing)
+        {
+            cameras[2]->TakePhoto();
+        }
+        tmrTrainCrossing.Setms(2000);
+        Monitor::isTrainCrossing=true;
+    }
+    else
+    {
+        if(!tmrTrainCrossing.IsClear())
+        {
+            if(tmrTrainCrossing.IsExpired())
+            {
+                Monitor::isTrainCrossing=false;
+                tmrTrainCrossing.Clear();
+            }
+        }
+    }
+
     for (int i = 0; i < 2; i++)
     {
         monitors[i]->Task();

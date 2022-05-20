@@ -17,6 +17,8 @@ public:
     virtual void PeriodicRun() override;
 
 private:
+    BootTimer tmrTrainCrossing;
+    bool isTrainCrossing{false};
 };
 
 

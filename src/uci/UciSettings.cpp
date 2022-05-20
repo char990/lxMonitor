@@ -70,12 +70,12 @@ void UciSettings::LoadConfig()
 		}
 		if (i == 0) // Monitor1
 		{
-			c.stopTrigger = GetInt(uciSec, _StopTrigger, 1000, 5000, true);
+			c.stopTrigger = GetInt(uciSec, _StopTrigger, 300, 5000, true);
 			c.stopPass = GetInt(uciSec, _StopPass, c.stopTrigger + 100, 5000, true);
 		}
 		else
 		{
-			c.stopPass = GetInt(uciSec, _StopPass, 1000, 5000, true);
+			c.stopPass = GetInt(uciSec, _StopPass, 300, 5000, true);
 			c.stopTrigger = GetInt(uciSec, _StopTrigger, c.stopPass + 100, 5000, true);
 		}
 		c.vstopDelay = GetInt(uciSec, _VstopDelay, 1000, 5000, true);

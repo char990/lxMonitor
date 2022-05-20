@@ -17,6 +17,7 @@ public:
     ~Monitor();
 
     void Task();
+    static bool isTrainCrossing;
 
 private:
     int id;
@@ -32,8 +33,10 @@ private:
     Radar::Stalker::StalkerTSS2 **stalkers;
     Camera **cams;
 
+    bool isTrainCrossingRecord{false};
+
     /*********************iSysClos********************/
-    BootTimer tmriSysClos;
+    BootTimer tmriSysClosTimeout;
     Radar::iSys::VehicleFilter vfiSysClos;
     int lastClosRange{-1};
     int IsNewiSysClos();
@@ -42,7 +45,7 @@ private:
     int iSysClosWillStop{0};
 
     /*********************iSysAway********************/
-    BootTimer tmriSysAway;
+    BootTimer tmriSysAwayTimeout;
     Radar::iSys::VehicleFilter vfiSysAway;
     int lastAwayRange{-1};
     BootTimer tmrVstopDly;
