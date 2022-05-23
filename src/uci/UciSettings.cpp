@@ -79,6 +79,7 @@ void UciSettings::LoadConfig()
 			c.stopTrigger = GetInt(uciSec, _StopTrigger, c.stopPass + 100, 5000, true);
 		}
 		c.vstopDelay = GetInt(uciSec, _VstopDelay, 1000, 5000, true);
+		c.vstopSpeed = GetInt(uciSec, _VstopSpeed, 1, 50, true);
 		c.camRange = GetInt(uciSec, _CamRange, 1, 3, true);
 		c.camVstop = GetInt(uciSec, _CamVstop, 1, 3, true);
 		c.stkrCapture = GetInt(uciSec, _StkrCapture, 0, 1, true);
@@ -100,8 +101,6 @@ void UciSettings::LoadConfig()
 		uciiSys[i].radarId = GetInt(uciSec, _RadarId, 2, 255, true); // 0 & 1 not allowed
 		uciiSys[i].radarMode = GetInt(uciSec, _RadarMode, 0, INT_MAX, true);
 		uciiSys[i].radarCode = GetInt(uciSec, _RadarCode, 0, INT_MAX, true);
-		uciiSys[i].rangeRise = GetInt(uciSec, _RangeRise, 1, 5000, true);
-		uciiSys[i].rangeLast = GetInt(uciSec, _RangeLast, 1, 5000, true);
 		uciiSys[i].minClos = GetInt(uciSec, _MinClos, 1, 5000, true);
 		uciiSys[i].maxClos = GetInt(uciSec, _MaxClos, uciiSys[i].minAway + 1000, 15000, true);
 		uciiSys[i].minAway = GetInt(uciSec, _MinAway, 1, 5000, true);
@@ -110,6 +109,8 @@ void UciSettings::LoadConfig()
 		uciiSys[i].minSpeed = GetInt(uciSec, _MinSpeed, 1, 99, true);
 		uciiSys[i].maxSpeed = GetInt(uciSec, _MaxSpeed, uciiSys[i].minSpeed + 1, 255, true);
 		uciiSys[i].cmErr = GetInt(uciSec, _CmErr, 1, 5000, true);
+		uciiSys[i].rangeRise = GetInt(uciSec, _RangeRise, 1, 5000, true);
+		uciiSys[i].rangeLast = GetInt(uciSec, _RangeLast, uciiSys[i].minClos+1000, 5000, true);
 	}
 
 	// stalker

@@ -32,6 +32,8 @@ private:
     Radar::iSys::iSys400x **isys400xs;
     Radar::Stalker::StalkerTSS2 **stalkers;
     Camera **cams;
+    Camera *camRange;
+    Camera *camVstop;
 
     bool isTrainCrossingRecord{false};
 

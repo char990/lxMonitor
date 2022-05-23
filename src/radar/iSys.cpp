@@ -144,6 +144,15 @@ const uint8_t set_FreqChannel[] = {
 	// 0x00 0x04 FreqChannel
 };
 
+int Vehicle::Print()
+{
+	return PrintDbg(DBG_PRT, "S=%3d V=%3d R=%5d A=%3d\n", signal, speed, range, angle);
+}
+int Vehicle::Print(char *buf)
+{
+	return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle);
+}
+
 void VehicleFilter::PushVehicle(Vehicle *v)
 {
 	if (!v->IsValid())

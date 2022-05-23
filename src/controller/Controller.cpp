@@ -17,7 +17,7 @@ Controller::~Controller()
 
 void Controller::PeriodicRun()
 {
-    if(cameras[2]->alarm->IsHigh())
+    if(cameras[2]->alarm->IsLow())
     {
         if(!Monitor::isTrainCrossing)
         {

@@ -97,6 +97,7 @@ void GpioInit()
     for (int i = 0; i < sizeof(pins) / sizeof(pins[0]); i++)
     {
         GpioEx::Export(pins[i]);
+        Utils::Time::SleepMs(100);                    // must sleep 100ms to wait "export"
     }
     Utils::Time::SleepMs(1000);                    // must sleep 1 second to wait "export"
     pPinHeartbeatLed = new GpioOut(PIN_HB_LED, 1); // heartbeat led, yellow

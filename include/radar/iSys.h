@@ -43,8 +43,8 @@ namespace Radar
             int16_t range;     // cm
             int16_t angle;     // deg
             bool IsValid() { return signal > 0; };
-            int Print() { return printf("S=%3d V=%3d R=%5d A=%3d\n", signal, speed, range, angle); }
-            int Print(char *buf) { return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle); }
+            int Print();
+            int Print(char *buf);
             void Reset() { signal = 0; };
         };
 

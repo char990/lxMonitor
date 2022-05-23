@@ -10,7 +10,6 @@
 #include <radar/Stalker.h>
 #include <controller/Monitor.h>
 
-
 const Command DebugConsole::CMD_LIST[] = {
     {"?",
      "This help",
@@ -26,7 +25,7 @@ const Command DebugConsole::CMD_LIST[] = {
      DebugConsole::Cmd_ws},*/
     {"cam",
      "Take photo by camera 1-3. Usage: cam 1-3\n"
-     "\t| Set camera 1-3 debug. Usage: cam 1-3 X",
+     "\t| Set camera 1-3 debug. Usage: cam 1-3 X(0:Off, 1:alarm, 2:shoot)",
      DebugConsole::Cmd_cam},
     {"stkr",
      "Stalker 1|2 debug info X(0:Off, 1:Clos). Usage: stkr 1|2 X",
@@ -187,27 +186,28 @@ int DebugConsole::Cmd_ws(int argc, char *argv[])
 int DebugConsole::Cmd_cam(int argc, char *argv[])
 {
     char c;
-    if (argc >= 2)
+    int r = -1;
+    if (argc == 2 || argc == 3)
     {
-        if (sscanf(argv[1], "%c", &c) != 1 || c < '1' || c > '3')
+        if (sscanf(argv[1], "%c", &c) == 1 && (c >= '1' && c <= '3'))
         {
-            return -1;
+            if (argc == 2)
+            {
+                cameras[c - '1']->ConTakePhoto();
+                r = 0;
+            }
+            else
+            {
+                int x;
+                if (sscanf(argv[2], "%d", &x) == 1 && (x>=0 && x<=2))
+                {
+                    cameras[c - '1']->SetVdebug(x);
+                    r = 0;
+                }
+            }
         }
     }
-    if (argc == 2)
-    {
-        cameras[c - '1']->ConTakePhoto();
-    }
-    else if (argc == 3)
-    {
-        int x;
-        if (sscanf(argv[2], "%d", &x) != 1)
-        {
-            return -1;
-        }
-        cameras[c - '1']->SetVdebug(x);
-    }
-    return 0;
+    return -1;
 }
 
 int DebugConsole::Cmd_stkr(int argc, char *argv[])

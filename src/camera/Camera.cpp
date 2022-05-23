@@ -18,7 +18,7 @@ Camera::~Camera()
 void Camera::PeriodicRun()
 {
     alarm->PeriodicRun();
-    if (GetVdebug())
+    if (GetVdebug()>=1)
     {
         if (alarm->IsHigh() != alarm_dbg)
         {
@@ -37,6 +37,10 @@ bool Camera::TaskTakePhoto(int *_ptLine)
     while (true)
     {
         PT_WAIT_UNTIL(toTakePhoto == true);
+        if (GetVdebug()>=2)
+        {
+            PrintDbg(DBG_PRT, "cam[%d]-shooting begin", id);
+        }
         takephoto->SetPinLow();
         tmrTakePhoto.Setms(TAKINGPHOTO_TIME - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
@@ -44,9 +48,16 @@ bool Camera::TaskTakePhoto(int *_ptLine)
         tmrTakePhoto.Setms(1000 - TAKINGPHOTO_TIME - 1);
         PT_WAIT_UNTIL(tmrTakePhoto.IsExpired());
         toTakePhoto = false;
+        if (GetVdebug()>=2)
+        {
+            PrintDbg(DBG_PRT, "cam[%d]-shooting end", id);
+        }
         if (conTakePhoto)
         {
-            PrintDbg(DBG_PRT, "cam[%d]-shot", id);
+            if (!(GetVdebug()>=2))
+            {
+                PrintDbg(DBG_PRT, "cam[%d]-shot", id);
+            }
             conTakePhoto = false;
         }
     };
