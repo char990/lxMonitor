@@ -207,7 +207,7 @@ int DebugConsole::Cmd_cam(int argc, char *argv[])
             }
         }
     }
-    return -1;
+    return r;
 }
 
 int DebugConsole::Cmd_stkr(int argc, char *argv[])
