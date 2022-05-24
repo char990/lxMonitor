@@ -45,10 +45,12 @@ void Monitor::Task()
         if (isTrainCrossing)
         {
             isyscsv->SaveRadarMeta("Train is crossing", " ");
+            PrintDbg(DBG_PRT, "Train is crossing");
         }
         else
         {
             isyscsv->SaveRadarMeta("Train left", " ");
+            PrintDbg(DBG_PRT, "Train left");
         }
         isTrainCrossingRecord = isTrainCrossing;
     }
@@ -83,7 +85,7 @@ void Monitor::TaskStkrClos()
             }
             else
             {
-               camRange->TakePhoto();
+                camRange->TakePhoto();
                 if (GetVdebug() >= 1)
                 {
                     PrintDbg(DBG_PRT, "Monitor[%d]-STKR takes photo", id);
@@ -282,11 +284,14 @@ void Monitor::TaskiSys1()
     {
         photo = 0;
         auto isys400x = isys400xs[ucimonitor.isysClos - 1];
-        if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vClos.IsValid())
+        if (isys400x->GetStatus() == RadarStatus::EVENT && vfiSysClos.nullcnt <= VF_SIZE)
         {
-            auto & vClos = isys400x->vClos;
-            tmriSysClosTimeout.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
-            vfiSysClos.PushVehicle(&vClos);
+            if (isys400x->vClos.IsValid())
+            {
+                tmriSysClosTimeout.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
+            }
+            vfiSysClos.PushVehicle(&isys400x->vClos);
+            auto &vClos = vfiSysClos.items[VF_SIZE];
             if (vfiSysClos.isCA) // closing
             {
                 if (IsNewiSysClos())
@@ -324,11 +329,14 @@ void Monitor::TaskiSys1()
     {
         photo = 0;
         auto isys400x = isys400xs[ucimonitor.isysAway - 1];
-        if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vAway.IsValid())
+        if (isys400x->GetStatus() == RadarStatus::EVENT && vfiSysAway.nullcnt <= VF_SIZE)
         {
-            auto & vAway = isys400x->vAway;
-            tmriSysAwayTimeout.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
-            vfiSysAway.PushVehicle(&vAway);
+            if (isys400x->vAway.IsValid())
+            {
+                tmriSysAwayTimeout.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
+            }
+            vfiSysAway.PushVehicle(&isys400x->vAway);
+            auto &vAway = vfiSysAway.items[VF_SIZE];
             if (vfiSysAway.isCA) // away
             {
                 if (IsNewiSysAway())
@@ -347,7 +355,7 @@ void Monitor::TaskiSys1()
                     tmrVstopDly.Setms(ucimonitor.vstopDelay);
                     if (GetVdebug() >= 2)
                     {
-                        PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - iSysAwayWillStop", id);
+                        PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - Slow down(%dKm/h)", id, vAway.speed);
                     }
                 }
                 if (lastAwayRange < ucimonitor.stopPass && vAway.range >= ucimonitor.stopPass)
@@ -377,7 +385,7 @@ void Monitor::TaskiSys1()
                     tmrVstopDly.Setms(ucimonitor.vstopDelay);
                     if (GetVdebug() >= 2)
                     {
-                        PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts", id);
+                        PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - %d >>> %d", id, lastAwayRange, vAway.range);
                     }
                 }
                 lastAwayRange = vAway.range;
@@ -431,11 +439,14 @@ void Monitor::TaskiSys2()
     /******************* Clos *******************/
     photo = 0;
     auto isys400x = isys400xs[ucimonitor.isysClos - 1];
-    if (isys400x->GetStatus() == RadarStatus::EVENT && isys400x->vClos.IsValid())
+    if (isys400x->GetStatus() == RadarStatus::EVENT && vfiSysClos.nullcnt <= VF_SIZE)
     {
-        auto & vClos = isys400x->vClos;
-        tmriSysClosTimeout.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
-        vfiSysClos.PushVehicle(&vClos);
+        if (isys400x->vClos.IsValid())
+        {
+            tmriSysClosTimeout.Setms(ISYS_VEHICLE_VALID_TIMEOUT);
+        }
+        vfiSysClos.PushVehicle(&isys400x->vClos);
+        auto &vClos = vfiSysClos.items[VF_SIZE];
         if (vfiSysClos.isCA) // closing
         {
             if (IsNewiSysClos())
@@ -451,7 +462,7 @@ void Monitor::TaskiSys2()
                 tmrVstopDly.Setms(ucimonitor.vstopDelay);
                 if (GetVdebug() >= 2)
                 {
-                    PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - iSysClosWillStop", id);
+                    PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - Slow down(%dKm/h)", id, vClos.speed);
                 }
             }
             if (lastClosRange > ucimonitor.stopPass && vClos.range <= ucimonitor.stopPass)
@@ -481,7 +492,7 @@ void Monitor::TaskiSys2()
                 tmrVstopDly.Setms(ucimonitor.vstopDelay);
                 if (GetVdebug() >= 2)
                 {
-                    PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - passed stopTrigger", id);
+                    PrintDbg(DBG_PRT, "Monitor[%d]: tmrVstopDly starts - %d >>> %d", id, lastClosRange, vClos.range);
                 }
             }
             else if (distanceIndex < ucimonitor.distance.size() && vClos.range > ucimonitor.stopPass)

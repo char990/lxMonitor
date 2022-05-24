@@ -153,14 +153,48 @@ int Vehicle::Print(char *buf)
 	return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle);
 }
 
+#define TKF_S_RK (4e-2)
+#define TKF_S_QK (1e-4)
+#define TKF_R_RK (4e-2)
+#define TKF_R_QK (1e-4)
+
+VehicleFilter::VehicleFilter()
+	: tkf_speed(TKF_S_RK, TKF_S_QK), tkf_range(TKF_R_RK, TKF_R_QK)
+{
+	Reset();
+};
+/*
+VehicleFilter::VehicleFilter(int cmErr)
+: cmErr(cmErr), tkf(TKF_RK, TKF_QK)
+{
+   Reset();
+};
+*/
+#if 0
 void VehicleFilter::PushVehicle(Vehicle *v)
 {
+	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
 	if (!v->IsValid())
 	{
-		return;
+		if(nullcnt<VF_SIZE)
+		{
+			nullcnt++;
+			int usec = v->usec - items[VF_SIZE-1].usec;
+			int speed = items[VF_SIZE-1].speed;
+			items[VF_SIZE].range -= RangeCM_sp_us(speed, usec);
+			items[VF_SIZE].signal = items[VF_SIZE-1].signal;
+			items[VF_SIZE].angle = items[VF_SIZE-1].angle;
+		}
+		else
+		{
+			return;
+		}
 	}
-	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
-	memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
+	else
+	{
+		nullcnt=0;
+		memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
+	}
 	isCA = false;
 	for (int i = 0; i < VF_SIZE; i++)
 	{
@@ -210,12 +244,91 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 		}
 	}
 };
+#else
+void VehicleFilter::PushVehicle(Vehicle *v)
+{
+	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
+	if (!v->IsValid())
+	{
+		if(nullcnt<VF_SIZE)
+		{
+			nullcnt++;
+			int usec = v->usec - items[VF_SIZE-1].usec;
+			int speed = items[VF_SIZE-1].speed;
+			items[VF_SIZE].range -= RangeCM_sp_us(speed, usec);
+			items[VF_SIZE].signal = items[VF_SIZE-1].signal;
+			items[VF_SIZE].angle = items[VF_SIZE-1].angle;
+		}
+		else
+		{
+			return;
+		}
+	}
+	else
+	{
+		nullcnt=0;
+		memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
+	}
+	items[VF_SIZE].range = tkf_range.update(items[VF_SIZE].range);
+	items[VF_SIZE].speed = tkf_range.update(items[VF_SIZE].speed);
+	isCA = false;
+	for (int i = 0; i < VF_SIZE; i++)
+	{
+		int speed = items[i].speed;
+		int usec = items[i + 1].usec - items[i].usec;
+		int cm = items[i + 1].range - items[i].range;
+		if (items[i].usec == 0 || usec <= 0 || usec > 500000 || (speed > 0 && cm > 0) || (speed < 0 && cm < 0))
+		{
+			return;
+		}
+		if (speed < 0)
+		{
+			cm = -cm;
+			speed = -speed;
+		}
+		int r = RangeCM_sp_us(speed, usec);
+		cm = (cm > r) ? (cm - r) : (r - cm);
+		if (cm > cmErr)
+		{
+			return;
+		}
+	}
+	isCA = true;
+	isSlowdown = false;
+	isSpeedUp = false;
 
+	if (items[0].speed > 0 && items[1].speed > 0 && items[2].speed > 0)
+	{
+		if (items[0].speed > items[1].speed && items[1].speed > items[2].speed > 0)
+		{
+			isSlowdown = true;
+		}
+		else if (items[0].speed < items[1].speed && items[1].speed<items[2].speed> 0)
+		{
+			isSpeedUp = true;
+		}
+	}
+	else if (items[0].speed < 0 && items[1].speed < 0 && items[2].speed < 0)
+	{
+		if (items[0].speed > items[1].speed && items[1].speed > items[2].speed > 0)
+		{
+			isSpeedUp = true;
+		}
+		else if (items[0].speed < items[1].speed && items[1].speed<items[2].speed> 0)
+		{
+			isSlowdown = true;
+		}
+	}
+};
+#endif
 void VehicleFilter::Reset()
 {
 	bzero(items, sizeof(items));
 	isCA = false;
 	isSlowdown = false;
+	nullcnt = 0;
+	tkf_range.reset();
+	tkf_speed.reset();
 }
 #if 0
 void TargetList::Reset()

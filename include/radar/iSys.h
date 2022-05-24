@@ -9,6 +9,7 @@
 #include <module/BootTimer.h>
 #include <fsworker/SaveCSV.h>
 #include <module/IPeriodicRun.h>
+#include <3rdparty/Kalman/TrivialKalmanFilter.h>
 
 namespace Radar
 {
@@ -52,11 +53,11 @@ namespace Radar
         {
         public:
 #define VF_SIZE 2
-            VehicleFilter(){};
-            VehicleFilter(int cmErr) : cmErr(cmErr)
-            {
-                Reset();
-            };
+            VehicleFilter();
+            //VehicleFilter(int cmErr);
+            TrivialKalmanFilter<float> tkf_speed;
+            TrivialKalmanFilter<float> tkf_range;
+            int nullcnt{0};
             void PushVehicle(Vehicle *v);
             Vehicle items[VF_SIZE + 1];
             bool isCA{false}; // Closing or Away confirmed
@@ -66,6 +67,7 @@ namespace Radar
             void Reset();
         };
 
+#if 0
         class TargetList
         {
         public:
@@ -105,7 +107,7 @@ namespace Radar
                 0, 0
             };
         };
-
+#endif
         class iSys400xPower : public IPeriodicRun
         {
 #define ISYS_PWR_0_T 4000
