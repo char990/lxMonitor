@@ -17,7 +17,8 @@ public:
     ~Monitor();
 
     void Task();
-    static bool isTrainCrossing;
+
+    void SetVfDebug(int n);
 
 private:
     int id;
@@ -35,7 +36,12 @@ private:
     Camera *camRange;
     Camera *camVstop;
 
+
+    /*********************Train********************/
+    UciTrian &uciTrain;
     bool isTrainCrossingRecord{false};
+    static bool isTrainCrossing;
+    BootTimer tmrTrainCrossing;
 
     /*********************iSysClos********************/
     BootTimer tmriSysClosTimeout;

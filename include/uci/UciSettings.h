@@ -58,7 +58,6 @@ public:
 class UciTrian
 {
 public:
-    int monitor;
     int range[2];
 };
 
@@ -93,7 +92,6 @@ private:
     const char *_Site = "Site";
 
     const char *_Train = "Train";           // section
-    //const char *_Monitor = "Monitor";
     const char *_Range = "Range";
 
     const char *_Monitor = "Monitor";       // section

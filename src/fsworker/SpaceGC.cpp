@@ -47,9 +47,9 @@ void SpaceGC::CollectGarbage()
                     bgc = true;
                     char buf[1024];
                     PrintStatVfs(buf);
-                    PrintDbg(DBG_LOG, "'%s' GC starts: %s", metapath, buf);
+                    Ldebug("'%s' GC starts: %s", metapath, buf);
                 }
-                PrintDbg(DBG_LOG, "Remove dir '%s'", subdir.at(sdindex).c_str());
+                Ldebug("Remove dir '%s'", subdir.at(sdindex).c_str());
                 if (Utils::Exec::Shell("rm -rf %s", subdir.at(sdindex).c_str()) != 0)
                 {
                     throw std::runtime_error(FmtException("rm -rf %s failed", subdir.at(sdindex).c_str()));
@@ -61,7 +61,7 @@ void SpaceGC::CollectGarbage()
                 {
                     char buf[1024];
                     PrintStatVfs(buf);
-                    PrintDbg(DBG_LOG, "'%s' GC finished: %s", metapath, buf);
+                    Ldebug("'%s' GC finished: %s", metapath, buf);
                 }
                 return;
             }
@@ -95,7 +95,7 @@ void SpaceGC::RefreshVfsSt()
     {
         char buf[256];
         sprintf(buf, "statvfs(%s) failed", metapath);
-        PrintDbg(DBG_LOG, buf);
+        Ldebug(buf);
         throw std::runtime_error(buf);
     }
 }

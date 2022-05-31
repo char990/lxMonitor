@@ -34,6 +34,7 @@ private:
     static int Cmd_isys(int argc, char *argv[]);
     static int Cmd_stkr(int argc, char *argv[]);
     static int Cmd_monitor(int argc, char *argv[]);
+    static int Cmd_vf(int argc, char *argv[]);
     
 
     static const Command CMD_LIST[];

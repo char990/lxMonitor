@@ -74,7 +74,7 @@ int SaveCSV::SaveRadarMeta(struct timeval &time, const char *comment, const char
             csvfd = system(csv);
             if (csvfd != 0)
             {
-                PrintDbg(DBG_LOG, "Can NOT mkdir '%s/%s'", metapath, date);
+                Ldebug("Can NOT mkdir '%s/%s'", metapath, date);
                 csvfd = -1;
                 lastdate[0] = 0;
             }
@@ -84,7 +84,7 @@ int SaveCSV::SaveRadarMeta(struct timeval &time, const char *comment, const char
                 csvfd = open(csv, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
                 if (csvfd < 0)
                 {
-                    PrintDbg(DBG_LOG, "Can NOT open '%s'", csv);
+                    Ldebug("Can NOT open '%s'", csv);
                     lastdate[0] = 0;
                 }
             }

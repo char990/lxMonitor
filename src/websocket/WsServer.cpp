@@ -32,7 +32,7 @@ void WsServer::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
             // Websocket connection, which will receive MG_EV_WS_MSG events.
             mg_ws_upgrade(c, hm, NULL);
             uint8_t *ip = (uint8_t *)&c->rem.ip;
-            PrintDbg(DBG_LOG, "Connected WS on %s, from %d.%d.%d.%d", WS, ip[0], ip[1], ip[2], ip[3]);
+            Ldebug("Connected WS on %s, from %d.%d.%d.%d", WS, ip[0], ip[1], ip[2], ip[3]);
             c->fn_data = (void *)WS;
         }
         else if (mg_http_match_uri(hm, ECHO))
@@ -41,7 +41,7 @@ void WsServer::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
             // Websocket connection, which will receive MG_EV_WS_MSG events.
             mg_ws_upgrade(c, hm, NULL);
             uint8_t *ip = (uint8_t *)&c->rem.ip;
-            PrintDbg(DBG_LOG, "Connected WS on %s, from %d.%d.%d.%d", ECHO, ip[0], ip[1], ip[2], ip[3]);
+            Ldebug("Connected WS on %s, from %d.%d.%d.%d", ECHO, ip[0], ip[1], ip[2], ip[3]);
             c->fn_data = (void *)ECHO;
         }
         else if (mg_http_match_uri(hm, REST))
@@ -80,7 +80,7 @@ void WsServer::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
         if (c->fn_data == (void *)ECHO || c->fn_data == (void *)WS)
         {
             uint8_t *ip = (uint8_t *)&c->rem.ip;
-            PrintDbg(DBG_LOG, "Disconnected WS on %s, from %d.%d.%d.%d", (const char *)c->fn_data, ip[0], ip[1], ip[2], ip[3]);
+            Ldebug("Disconnected WS on %s, from %d.%d.%d.%d", (const char *)c->fn_data, ip[0], ip[1], ip[2], ip[3]);
         }
     }
     (void)fn_data;
@@ -96,7 +96,7 @@ WsServer::WsServer(int port, TimerEvent *tmrEvt)
     char buf[32];
     sprintf(buf, "ws://0.0.0.0:%d", port);
     mg_mgr_init(&mgr); // Initialise event manager
-    PrintDbg(DBG_LOG, "Starting WS listener on %s%s", buf, WS);
+    Ldebug("Starting WS listener on %s%s", buf, WS);
     mg_http_listen(&mgr, buf, fn, NULL); // Create HTTP listener
     tmrEvt->Add(this);
 }

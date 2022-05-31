@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
         auto controller = new Controller();
         tmrEvt10ms->Add(controller);
 
-        PrintDbg(DBG_LOG, ">>> DONE >>>");
+        Ldebug(">>> DONE >>>");
         printf("\n=>Input '?<Enter>' to get console help.\n\n");
         /*************** Start ****************/
         while (1)
@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
     catch (const std::exception &e)
     {
         // muntrace();
-        PrintDbg(DBG_LOG, "\n!!! main exception :%s", e.what());
+        Ldebug("\n!!! main exception :%s", e.what());
         return 255;
         // clean
     }

@@ -13,7 +13,7 @@ int Files::GetDirs(std::string path, std::vector<std::string> &subdir, int depth
     DIR *dir = opendir(path.c_str());
     if (dir == nullptr)
     {
-        PrintDbg(DBG_LOG, "Can't open '%s'", path.c_str());
+        Ldebug("Can't open '%s'", path.c_str());
         return -1;
     }
     struct dirent *entry;

@@ -17,27 +17,6 @@ Controller::~Controller()
 
 void Controller::PeriodicRun()
 {
-    if(cameras[2]->alarm->IsLow())
-    {
-        if(!Monitor::isTrainCrossing)
-        {
-            cameras[2]->TakePhoto();
-        }
-        tmrTrainCrossing.Setms(2000);
-        Monitor::isTrainCrossing=true;
-    }
-    else
-    {
-        if(!tmrTrainCrossing.IsClear())
-        {
-            if(tmrTrainCrossing.IsExpired())
-            {
-                Monitor::isTrainCrossing=false;
-                tmrTrainCrossing.Clear();
-            }
-        }
-    }
-
     for (int i = 0; i < 2; i++)
     {
         monitors[i]->Task();
@@ -68,7 +47,7 @@ void Controller::PeriodicRun()
             isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle passed/Train is passing...");
             if (isys400x->Vdebug() >= 1)
             {
-                PrintDbg(DBG_PRT, "[%d]:Vehicle passed/Train is passing...", camVstop->Id());
+                Pdebug("[%d]:Vehicle passed/Train is passing...", camVstop->Id());
             }
             tmrTrainDly.Setms(1500);
         }
@@ -95,7 +74,7 @@ void Controller::PeriodicRun()
                     isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle stops");
                     if (isys400x->Vdebug() >= 1)
                     {
-                        PrintDbg(DBG_PRT, "[%d]:Vehicle stops", camVstop->Id());
+                        Pdebug("[%d]:Vehicle stops", camVstop->Id());
                     }
                 }
                 tmrVstopDly.Clear();
@@ -114,7 +93,7 @@ void Controller::PeriodicRun()
             isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle passed");
             if (isys400x->Vdebug() >= 1)
             {
-                PrintDbg(DBG_PRT, "[%d]:Vehicle passed", camVstop->Id());
+                Pdebug("[%d]:Vehicle passed", camVstop->Id());
             }
         }
         else
@@ -128,7 +107,7 @@ void Controller::PeriodicRun()
                     isys400x->SaveMeta(PHOTO_TAKEN, "Vehicle stops");
                     if (isys400x->Vdebug() >= 1)
                     {
-                        PrintDbg(DBG_PRT, "[%d]:Vehicle stops", camVstop->Id());
+                        Pdebug("[%d]:Vehicle stops", camVstop->Id());
                     }
                 }
                 tmrVstopDly.Clear();

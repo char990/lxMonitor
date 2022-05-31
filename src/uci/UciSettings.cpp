@@ -12,7 +12,7 @@ using namespace Utils;
 
 void UciSettings::LoadConfig()
 {
-	PrintDbg(DBG_LOG, ">>> Loading 'UciSettings'");
+	Ldebug(">>> Loading 'UciSettings'");
 	PATH = DbHelper::Instance().Path();
 	PACKAGE = "UciSettings";
 	Open();
@@ -38,11 +38,10 @@ void UciSettings::LoadConfig()
 	// train
 	SECTION = _Train;
 	uciSec = GetSection(SECTION);
-	uciTrain.monitor = GetInt(uciSec, _Monitor, 1, 2, true);
 	{ // range
 		str = GetStr(uciSec, _Range);
 		int ibuf[2];
-		int cnt = Cnvt::GetIntArray(str, 2, ibuf, 1, 15000);
+		int cnt = Cnvt::GetIntArray(str, 2, ibuf, 1000, 5000);
 		if (cnt != 2 || ibuf[0] >= ibuf[1])
 		{
 			throw std::invalid_argument(FmtException("Train.Range error"));
@@ -160,7 +159,6 @@ void UciSettings::Dump()
 	PrintOption_str(_Site, uciCloud.site.c_str());
 
 	printf("%s:\n", _Train);
-	PrintOption_d(_Monitor, uciTrain.monitor);
 	printf("\t%s \t'%d, %d'\n", _Range, uciTrain.range[0], uciTrain.range[1]);
 
 	for (int i = 0; i < 2; i++)

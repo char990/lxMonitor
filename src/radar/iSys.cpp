@@ -10,6 +10,9 @@
 #include <module/ptcpp.h>
 #include <gpio/GpioOut.h>
 
+#define TMR_OFFSET 9
+
+#define TMR_100MS (100-TMR_OFFSET)
 using namespace Utils;
 
 using namespace Radar;
@@ -146,17 +149,17 @@ const uint8_t set_FreqChannel[] = {
 
 int Vehicle::Print()
 {
-	return PrintDbg(DBG_PRT, "S=%3d V=%3d R=%5d A=%3d\n", signal, speed, range, angle);
+	return Pdebug("S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle);
 }
 int Vehicle::Print(char *buf)
 {
 	return sprintf(buf, "S=%3d V=%3d R=%5d A=%3d", signal, speed, range, angle);
 }
 
-#define TKF_S_RK (4e-2)
-#define TKF_S_QK (1e-4)
-#define TKF_R_RK (4e-2)
-#define TKF_R_QK (1e-4)
+#define TKF_S_RK (0.1)
+#define TKF_S_QK (0.1)
+#define TKF_R_RK (0.4)
+#define TKF_R_QK (0.1)
 
 VehicleFilter::VehicleFilter()
 	: tkf_speed(TKF_S_RK, TKF_S_QK), tkf_range(TKF_R_RK, TKF_R_QK)
@@ -247,17 +250,24 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 #else
 void VehicleFilter::PushVehicle(Vehicle *v)
 {
+	isCA = false;
+	isSlowdown = false;
+	isSpeedUp = false;
 	memcpy(&items[0], &items[1], VF_SIZE * sizeof(Vehicle));
 	if (!v->IsValid())
 	{
-		if(nullcnt<VF_SIZE)
+		if (nullcnt <= VF_SIZE)
 		{
-			nullcnt++;
-			int usec = v->usec - items[VF_SIZE-1].usec;
-			int speed = items[VF_SIZE-1].speed;
+			if (GetVdebug())
+			{
+				Pdebug("Vehicle not valid");
+			}
+			int usec = v->usec - items[VF_SIZE - 1].usec;
+			int speed = items[VF_SIZE - 1].speed;
 			items[VF_SIZE].range -= RangeCM_sp_us(speed, usec);
-			items[VF_SIZE].signal = items[VF_SIZE-1].signal;
-			items[VF_SIZE].angle = items[VF_SIZE-1].angle;
+			items[VF_SIZE].speed = speed;
+			items[VF_SIZE].usec = v->usec;
+			nullcnt++;
 		}
 		else
 		{
@@ -266,12 +276,39 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 	}
 	else
 	{
-		nullcnt=0;
 		memcpy(&items[VF_SIZE], v, sizeof(Vehicle));
+		if (nullcnt == VF_SIZE + 1 || (!items[VF_SIZE-2].IsValid() && !items[VF_SIZE-1].IsValid()))
+		{
+			if (GetVdebug())
+			{
+				char kbuf[256];
+				items[VF_SIZE].Print(kbuf);
+				Pdebug("%s ** reset", kbuf);
+			}
+			tkf_range.reset(v->range, 1);
+			tkf_speed.reset(v->speed, 1);
+			nullcnt = 0;
+			return;
+		}
+		if (GetVdebug())
+		{
+			char kbuf[256];
+			items[VF_SIZE].Print(kbuf);
+			Pdebug("%s", kbuf);
+		}
+		nullcnt = 0;
 	}
+
+	auto br = items[VF_SIZE].range;
+	auto bs = items[VF_SIZE].speed;
 	items[VF_SIZE].range = tkf_range.update(items[VF_SIZE].range);
-	items[VF_SIZE].speed = tkf_range.update(items[VF_SIZE].speed);
-	isCA = false;
+	items[VF_SIZE].speed = tkf_speed.update(items[VF_SIZE].speed);
+	if (GetVdebug())
+	{
+		char kbuf[256];
+		items[VF_SIZE].Print(kbuf);
+		Pdebug("%s * [r]=%d,[s]=%d\n", kbuf, br-items[VF_SIZE].range,bs-items[VF_SIZE].speed);
+	}
 	for (int i = 0; i < VF_SIZE; i++)
 	{
 		int speed = items[i].speed;
@@ -294,9 +331,6 @@ void VehicleFilter::PushVehicle(Vehicle *v)
 		}
 	}
 	isCA = true;
-	isSlowdown = false;
-	isSpeedUp = false;
-
 	if (items[0].speed > 0 && items[1].speed > 0 && items[2].speed > 0)
 	{
 		if (items[0].speed > items[1].speed && items[1].speed > items[2].speed > 0)
@@ -442,7 +476,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 	while (true)
 	{
 		PT_WAIT_UNTIL(iSysPwr == PwrSt::AUTOPWR_OFF);
-		PrintDbg(DBG_LOG, "iSys power-reset: START");
+		Ldebug("iSys power-reset: START");
 		RelayNcOff();
 		tmrRePwr.Setms(ISYS_PWR_0_T);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
@@ -450,7 +484,7 @@ bool iSys400xPower::TaskRePower_(int *_ptLine)
 		tmrRePwr.Setms(ISYS_PWR_1_T);
 		PT_WAIT_UNTIL(tmrRePwr.IsExpired());
 		iSysPwr = PwrSt::PWR_ON;
-		PrintDbg(DBG_LOG, "iSys power-reset: DONE");
+		Ldebug("iSys power-reset: DONE");
 	};
 	PT_END();
 }
@@ -590,7 +624,7 @@ int iSys400x::DecodeDeviceName()
 	{
 		return -1;
 	}
-	PrintDbg(DBG_LOG, "%s:%s", uciradar.name.c_str(), (char *)packet + ISYS_FRM_PDU);
+	Ldebug("%s:%s", uciradar.name.c_str(), (char *)packet + ISYS_FRM_PDU);
 	return 0;
 }
 
@@ -631,7 +665,7 @@ int iSys400x::DecodeFreqChannel()
 	if (VerifyCmdAck(RADAR_CMD_RD_FREQ_CHN))
 	{
 		c = packet[ISYS_FRM_PDU] * 0x100 + packet[ISYS_FRM_PDU + 1];
-		PrintDbg(DBG_LOG, "%s:freq channel:%d", uciradar.name.c_str(), c);
+		Ldebug("%s:freq channel:%d", uciradar.name.c_str(), c);
 	}
 	return c;
 }
@@ -669,7 +703,7 @@ bool iSys400x::TaskRadarPoll()
 				if (!IsNotConnected())
 				{
 					Connected(false);
-					PrintDbg(DBG_LOG, "%s NO_CONNECTION", uciradar.name.c_str());
+					Ldebug("%s NO_CONNECTION", uciradar.name.c_str());
 				}
 				if (pwrDelay == 0)
 				{
@@ -689,7 +723,7 @@ bool iSys400x::TaskRadarPoll()
 				if (!IsConnected())
 				{
 					Connected(true);
-					PrintDbg(DBG_LOG, "%s CONNECTED", uciradar.name.c_str());
+					Ldebug("%s CONNECTED", uciradar.name.c_str());
 				}
 				pwrDelay = 0;
 				tmrPwrDelay.Setms(pwrDelay);
@@ -718,7 +752,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 		{
 			ClearRxBuf();
 			CmdReadDeviceName();
-			tmrTaskRadar.Setms(100 - 1);
+			tmrTaskRadar.Setms(TMR_100MS);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			if (ReadPacket() > 0)
 			{
@@ -735,35 +769,35 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			do
 			{
 				CmdStopAcquisition();
-				tmrTaskRadar.Setms(100 - 1);
+				tmrTaskRadar.Setms(TMR_100MS);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 				taskRadarRS = 0;
 				PT_WAIT_TASK(TaskRadarReadSettings(&taskRadarRS));
 				if (taskRadarRS != -1)
 				{
-					PrintDbg(DBG_PRT, "%s settings error, Re-Write settings", uciradar.name.c_str());
+					Pdebug("%s settings error, Re-Write settings", uciradar.name.c_str());
 					taskRadarWS = 0;
 					PT_WAIT_TASK(TaskRadarWriteSettings(&taskRadarWS));
 					writeToEEP = true;
 					taskRadarWS = 0;
 				}
 			} while (taskRadarRS != -1);
-			PrintDbg(DBG_PRT, "%s settings OK", uciradar.name.c_str());
+			Pdebug("%s settings OK", uciradar.name.c_str());
 			if (writeToEEP)
 			{
-				PrintDbg(DBG_PRT, "%s save settings to eeprom", uciradar.name.c_str());
+				Pdebug("%s save settings to eeprom", uciradar.name.c_str());
 				CmdSaveToEEprom();
 				writeToEEP = false;
 			}
 			radarStatus = RadarStatus::BUSY;
 			ssTimeout.Setms(ISYS_TIMEOUT);
-			tmrTaskRadar.Setms(100 - 1);
+			tmrTaskRadar.Setms(TMR_100MS);
 			PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 			// start
 			do
 			{
 				CmdStartAcquisition();
-				tmrTaskRadar.Setms(100 - 1);
+				tmrTaskRadar.Setms(TMR_100MS);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 				if (VerifyCmdAck(RADAR_CMD_START))
 				{
@@ -773,7 +807,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 				else
 				{
 					CmdStopAcquisition();
-					tmrTaskRadar.Setms(100 - 1);
+					tmrTaskRadar.Setms(TMR_100MS);
 					PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 				}
 			} while (radarStatus != RadarStatus::READY);
@@ -784,7 +818,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 			{
 				ClearRxBuf();
 				CmdReadTargetList();
-				tmrTaskRadar.Setms(100 - 1);
+				tmrTaskRadar.Setms(TMR_100MS);
 				PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 				gettimeofday(&pktTime, nullptr);
 				if (DecodeTargetFrame() >= 0)
@@ -807,7 +841,7 @@ bool iSys400x::TaskRadarPoll_(int *_ptLine)
 					if (taskRadarRS != -1)
 					{
 						taskRadarWS = 1;
-						PrintDbg(DBG_LOG, "%s settings error", uciradar.name.c_str());
+						Ldebug("%s settings error", uciradar.name.c_str());
 					}
 					tmrTaskRadarSettings.Setms(15 * 60 * 1000);
 				}
@@ -822,7 +856,7 @@ bool iSys400x::TaskRadarReadSettings(int *_ptLine)
 	PT_BEGIN();
 	ClearRxBuf();
 	CmdReadFreqChannel();
-	tmrTaskRadar.Setms(100 - 1);
+	tmrTaskRadar.Setms(TMR_100MS);
 	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	if (DecodeFreqChannel() != uciradar.radarMode)
 	{
@@ -830,7 +864,7 @@ bool iSys400x::TaskRadarReadSettings(int *_ptLine)
 	}
 	ClearRxBuf();
 	CmdReadAppSetting(6);
-	tmrTaskRadar.Setms(100 - 1);
+	tmrTaskRadar.Setms(TMR_100MS);
 	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	if (DecodeAppSetting() != 0x0003)
 	{
@@ -838,7 +872,7 @@ bool iSys400x::TaskRadarReadSettings(int *_ptLine)
 	}
 	ClearRxBuf();
 	CmdReadAppSetting(7);
-	tmrTaskRadar.Setms(100 - 1);
+	tmrTaskRadar.Setms(TMR_100MS);
 	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	if (DecodeAppSetting() != 0)
 	{
@@ -851,13 +885,13 @@ bool iSys400x::TaskRadarWriteSettings(int *_ptLine)
 {
 	PT_BEGIN();
 	CmdSetFreqChannel();
-	tmrTaskRadar.Setms(100 - 1);
+	tmrTaskRadar.Setms(TMR_100MS);
 	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	CmdWriteAppSetting(6, 0x0003); // Clos & Away
-	tmrTaskRadar.Setms(100 - 1);
+	tmrTaskRadar.Setms(TMR_100MS);
 	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	CmdWriteAppSetting(7, 0); // OFF
-	tmrTaskRadar.Setms(100 - 1);
+	tmrTaskRadar.Setms(TMR_100MS);
 	PT_WAIT_UNTIL(tmrTaskRadar.IsExpired());
 	PT_END();
 }

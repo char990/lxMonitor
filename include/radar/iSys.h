@@ -49,12 +49,13 @@ namespace Radar
             void Reset() { signal = 0; };
         };
 
-        class VehicleFilter
+        class VehicleFilter : public Vdebug
         {
         public:
-#define VF_SIZE 2
+#define VF_SIZE 2   // must >= 2
             VehicleFilter();
-            //VehicleFilter(int cmErr);
+            // VehicleFilter(int cmErr);
+            bool IsValid(){return nullcnt<3;};
             TrivialKalmanFilter<float> tkf_speed;
             TrivialKalmanFilter<float> tkf_range;
             int nullcnt{0};
@@ -181,7 +182,6 @@ namespace Radar
             /// \brief  decodes target list frame received from iSYS device - Note: only 16-bit.
             /// \return -1:Error; 0:NO target; 1:Closing; 2:Away; 3:Both
             int DecodeTargetFrame(/*uint8_t *packet, int packetLen*/);
-
 #if 0
             int SaveTarget(const char *comment);
 

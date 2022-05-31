@@ -37,6 +37,9 @@ const Command DebugConsole::CMD_LIST[] = {
     {"monitor",
      "monitor 1|2 debug info X. Usage: monitor 1|2 X",
      DebugConsole::Cmd_monitor},
+    {"vf",
+     "vf of monitor(1|2) debug info X(0:Off, 1:Clos, 2:Away, 3:Both). Usage: vf 1|2 X\n",
+     DebugConsole::Cmd_vf},
 };
 
 DebugConsole::DebugConsole()
@@ -199,7 +202,7 @@ int DebugConsole::Cmd_cam(int argc, char *argv[])
             else
             {
                 int x;
-                if (sscanf(argv[2], "%d", &x) == 1 && (x>=0 && x<=2))
+                if (sscanf(argv[2], "%d", &x) == 1 && (x >= 0 && x <= 2))
                 {
                     cameras[c - '1']->SetVdebug(x);
                     r = 0;
@@ -261,11 +264,26 @@ int DebugConsole::Cmd_monitor(int argc, char *argv[])
 {
     if (argc == 3)
     {
+        int m = argv[1][0] - '1';
+        int s = argv[2][0] - '0';
+        if ((m == 0 || m == 1) && (s >= 0 && s <= 3))
+        {
+            monitors[m]->SetVdebug(s);
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int DebugConsole::Cmd_vf(int argc, char *argv[])
+{
+    if (argc == 3)
+    {
         int r = argv[1][0] - '1';
         int s = argv[2][0] - '0';
         if ((r == 0 || r == 1) && (s >= 0 && s <= 3))
         {
-            monitors[r]->SetVdebug(s);
+            monitors[r]->SetVfDebug(s);
             return 0;
         }
     }

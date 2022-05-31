@@ -129,7 +129,7 @@ int VehicleList::PushDgb1(const char *dbg1)
                 newVehicle = true;
                 if (GetVdebug() > 0)
                 {
-                    PrintDbg(DBG_PRT, "New %s:ID=%04d", (d->lastDir == 'A') ? "AWAY" : "CLOS", d->id);
+                    Pdebug("New %s:ID=%04d", (d->lastDir == 'A') ? "AWAY" : "CLOS", d->id);
                 }
                 if (GetVdebug() > 0)
                 {
@@ -168,7 +168,7 @@ void VehicleList::VehicleFlush(struct timeval &lasttime)
             if (GetVdebug() > 0)
             {
                 Print();
-                PrintDbg(DBG_PRT, "Vehicle disappeared:ID=%04d", id);
+                Pdebug("Vehicle disappeared:ID=%04d", id);
             }
         }
         else
@@ -221,7 +221,7 @@ int StalkerTSS2::RxCallback(uint8_t *data, int len)
                 {
                     if (dbg1len != 0 && GetVdebug() > 0)
                     {
-                        PrintDbg(DBG_PRT, "%s", dbg1buf);
+                        Pdebug("%s", dbg1buf);
                     }
                 }
                 radarStatus = RadarStatus::EVENT;
@@ -259,7 +259,7 @@ RadarStatus StalkerTSS2::GetStatus()
         ssTimeout.Clear();
         if (GetVdebug() > 0)
         {
-            PrintDbg(DBG_PRT, "%s ssTimeout\n", uciradar.name.c_str());
+            Pdebug("%s ssTimeout\n", uciradar.name.c_str());
         }
     }
     return radarStatus;
