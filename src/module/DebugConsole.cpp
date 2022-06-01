@@ -204,6 +204,7 @@ int DebugConsole::Cmd_cam(int argc, char *argv[])
                 int x;
                 if (sscanf(argv[2], "%d", &x) == 1 && (x >= 0 && x <= 2))
                 {
+                    cameras[c - '1']->alarm->Print();
                     cameras[c - '1']->SetVdebug(x);
                     r = 0;
                 }
